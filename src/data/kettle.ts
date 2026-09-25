@@ -19,11 +19,11 @@ const GRID = [
   '#FF##DDD####',
   '#FFF#DDDD###',
   '#E#FFDDDD###',
-  '#EE##BBBBCC#',
+  '#EE##BBBB###',
   '##E#BBBBBCC#',
   '##E#BBBBBCC#',
   '##E#BBBBBCC#',
-  '##E#BBBBBC##',
+  '##E#BBBB####',
   '##E#AAAA####',
   '##EA~~~A####',
   '###~A~~~####',
@@ -40,17 +40,23 @@ const GRID = [
  * stand on are c4 r6-r8, the talus at the foot of the Fernwell west wall that
  * Marlowe ruled on. Faces take the LOWER neighbour's height so the drop lands
  * inside the cell rather than at a cell boundary.
+ *
+ * Marlowe's ruling of 26/09/2026 narrowed Fernwell via the east flank: c10/c11
+ * at r5 and c9/c10 at r9 became cliff, and the Warm Stones became a real shelf
+ * four metres above the wet floor (c10 ramps to +9.25 at its centre, c11 flat
+ * at +11) instead of sharing the floor's height. Walkable total 74 -> 70.
+ * Absolute cliff heights are mine; Marlowe specified rises above the floor.
  */
 const HEIGHT = [
   [31, 31, 31, 32, 33, 33, 33, 33, 34, 34, 34, 34],
   [31, 24, 24, 31, 31, 12, 12, 12, 33, 34, 34, 34],
   [33, 24, 24, 20.25, 30, 10.5, 10.5, 10.5, 10.5, 33, 34, 34],
   [30, 23, 32, 16.5, 12.75, 9, 9, 9, 9, 20, 33, 34],
-  [30, 22, 21, 29, 20, 9, 9, 9, 9, 7, 7, 33],
-  [22, 29, 19, 8, 8, 8, 8, 8, 8, 7, 7, 33],
-  [21, 27, 17, 7, 7, 7, 7, 7, 7, 7, 7, 33],
-  [22, 27, 15, 6, 6, 6, 6, 6, 6, 7, 7, 33],
-  [27, 26, 12, 19, 5, 5, 5, 5, 5, 7, 30, 33],
+  [30, 22, 21, 29, 20, 9, 9, 9, 9, 22, 29, 33],
+  [22, 29, 19, 8, 8, 8, 8, 8, 8, 9.25, 11, 33],
+  [21, 27, 17, 7, 7, 7, 7, 7, 7, 9.25, 11, 33],
+  [22, 27, 15, 6, 6, 6, 6, 6, 6, 9.25, 11, 33],
+  [27, 26, 12, 19, 5, 5, 5, 5, 16, 19, 30, 33],
   [28, 24, 9, 16, 5, 5, 5, 5, 30, 31, 32, 33],
   [28, 22, 6, 2.8, 2.8, 2.8, 2.8, 2.8, 29, 30, 31, 32],
   [27, 20, 16, 0.55, 1.2, 0.55, 0.55, 0.55, 27, 29, 30, 31],

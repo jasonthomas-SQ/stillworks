@@ -15,15 +15,15 @@ for (let r = 1; r <= 12; r++) {
 }
 
 describe('reachability (token-agnostic: the slope rule is the only gate)', () => {
-  it('reaches exactly the 74 walkable cells plus the three allow-listed talus cells', () => {
+  it('reaches exactly the 70 walkable cells plus the three allow-listed talus cells', () => {
     const reached = reachableCells();
     const expected = new Set<string>([...walkable, ...ALLOWED_CLIFF_STANDING]);
     const leaks = [...reached].filter((k) => !expected.has(k)).sort();
     const missing = [...expected].filter((k) => !reached.has(k)).sort();
     expect({ leaks, missing }).toEqual({ leaks: [], missing: [] });
-    expect(walkable).toHaveLength(74);
+    expect(walkable).toHaveLength(70);
     expect([...ALLOWED_CLIFF_STANDING]).toEqual(['c4r6', 'c4r7', 'c4r8']);
-    expect(reached.size).toBe(77);
+    expect(reached.size).toBe(73);
   });
 
   it('the talus is a pocket, not a route — closed at both ends', () => {

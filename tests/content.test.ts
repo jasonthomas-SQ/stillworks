@@ -19,8 +19,10 @@ describe('kettle matches World Bible §5', () => {
     KETTLE.height.forEach((row) => expect(row).toHaveLength(12));
   });
 
-  it('has 74 walkable cells', () => {
-    expect(cells(tok).filter(isWalkableToken)).toHaveLength(74);
+  // Marlowe's ruling, 26/09/2026: Fernwell narrowed via the east flank.
+  // The "% explored" denominator is 70, not 74.
+  it('has 70 walkable cells', () => {
+    expect(cells(tok).filter(isWalkableToken)).toHaveLength(70);
   });
 
   it('has the bible zone counts', () => {
@@ -29,7 +31,7 @@ describe('kettle matches World Bible §5', () => {
       const z = zoneOf(t);
       if (z) counts[z] = (counts[z] ?? 0) + 1;
     }
-    expect(counts).toEqual({ A: 14, B: 24, C: 9, D: 11, E: 9, F: 7 });
+    expect(counts).toEqual({ A: 14, B: 23, C: 6, D: 11, E: 9, F: 7 });
   });
 
   it('has exactly the seven water cells', () => {
@@ -88,11 +90,9 @@ describe('kettle matches World Bible §5', () => {
       [7, 10, 7, 9],
       [8, 10, 8, 9], // A<->B
       [4, 11, 3, 11], // A<->E
-      [9, 5, 10, 5],
       [9, 6, 10, 6],
       [9, 7, 10, 7],
-      [9, 8, 10, 8],
-      [9, 9, 10, 9], // B<->C
+      [9, 8, 10, 8], // B<->C, a three-cell 30 m mouth after the narrowing
       [6, 5, 6, 4],
       [7, 5, 7, 4],
       [8, 5, 8, 4],
@@ -117,11 +117,6 @@ describe('kettle matches World Bible §5', () => {
       B7: 7,
       B6: 8,
       B5: 9,
-      C5: 7,
-      C6: 7,
-      C7: 7,
-      C8: 7,
-      C9: 7,
       D4: 9,
       D3: 10.5,
       D2: 12,
@@ -129,7 +124,7 @@ describe('kettle matches World Bible §5', () => {
     for (let r = 1; r <= 12; r++) {
       for (let c = 1; c <= 12; c++) {
         const z = zoneOf(tok(c, r));
-        if (!z || z === 'E' || z === 'F') continue;
+        if (!z || z === 'E' || z === 'F' || z === 'C') continue;
         const key = `${z}${r}`;
         if (!(key in spine)) continue;
         if (c === 5 && r === 12) continue; // the landing stage, deliberately lifted
@@ -151,6 +146,13 @@ describe('kettle matches World Bible §5', () => {
     ];
     for (const [c, r, h] of terrace) {
       expect(KETTLE.height[r - 1]![c - 1]!, `terrace c${c}r${r}`).toBe(h);
+    }
+
+    // The Warm Stones are a shelf four metres above the wet floor, not a
+    // continuation of it: c10 ramps up, c11 is flat on top.
+    for (const r of [6, 7, 8]) {
+      expect(KETTLE.height[r - 1]![9]!, `shelf ramp c10r${r}`).toBe(9.25);
+      expect(KETTLE.height[r - 1]![10]!, `shelf top c11r${r}`).toBe(11);
     }
 
     // The Winding Loft chamber sits flat at +24.
