@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../config';
 import { damp } from '../math/damp';
+import { cameraOffset, liftAboveGround } from './occlusion';
 import type { HeroState } from '../../entities/shim/heroController';
 
 export class FollowCamera {
@@ -22,24 +23,29 @@ export class FollowCamera {
   private lookAheadZ = 0;
 
   constructor() {
-    const { fovDeg, near, far, pitchDeg, yawDeg, distance } = CONFIG.camera;
+    const { fovDeg, near, far, yawDeg } = CONFIG.camera;
     this.camera = new THREE.PerspectiveCamera(fovDeg, 1, near, far);
     this.yaw = THREE.MathUtils.degToRad(yawDeg);
 
-    // Offset from the hero to the camera, fixed for the whole game.
-    const pitch = THREE.MathUtils.degToRad(pitchDeg);
-    this.offset.set(
-      Math.sin(this.yaw) * Math.cos(pitch) * distance,
-      Math.sin(pitch) * distance,
-      Math.cos(this.yaw) * Math.cos(pitch) * distance,
-    );
+    // Offset from the hero to the camera, fixed for the whole game. Taken from
+    // the pure module so the offline occlusion sweep and the real camera cannot
+    // disagree about where the camera is.
+    const { ox, oy, oz } = cameraOffset();
+    this.offset.set(ox, oy, oz);
+  }
+
+  /** Places the camera at target + offset, lifted clear of the ground. */
+  private place(): void {
+    const x = this.target.x + this.offset.x;
+    const z = this.target.z + this.offset.z;
+    this.camera.position.set(x, liftAboveGround(x, this.target.y + this.offset.y, z), z);
+    this.camera.lookAt(this.target);
   }
 
   /** Snap to the hero without damping. For the first frame and after a load. */
   snapTo(hero: HeroState): void {
     this.target.set(hero.x, hero.y + 0.6, hero.z);
-    this.camera.position.copy(this.target).add(this.offset);
-    this.camera.lookAt(this.target);
+    this.place();
   }
 
   update(hero: HeroState, dt: number): void {
@@ -63,8 +69,7 @@ export class FollowCamera {
       damp(this.target.z, wantZ, posDamp, dt),
     );
 
-    this.camera.position.copy(this.target).add(this.offset);
-    this.camera.lookAt(this.target);
+    this.place();
   }
 
   /**
