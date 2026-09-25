@@ -21,6 +21,7 @@ import { stepHero, initialHeroState, heroCell, type HeroState } from './entities
 import { stepPose, initialPoseMemory, type PoseMemory } from './entities/shim/shimPose';
 import { ShimView } from './entities/shim/shimView';
 import { occlusionAt } from './core/camera/occlusion';
+import { framingAt } from './core/camera/framing';
 import { groundHeightAt, isWaterAt } from './world/island/heightfield';
 import { cellCentre } from './data/kettle';
 
@@ -39,10 +40,21 @@ export type StillworksDebug = {
   teleport: (x: number, z: number) => HeroState;
   /** Put the hero at the centre of a 1-based grid cell, e.g. teleportCell(11, 7). */
   teleportCell: (c: number, r: number) => HeroState;
-  /** Hold a KeyboardEvent.code for `ms`, bypassing the DOM. Resolves when released. */
-  hold: (code: string, ms: number) => Promise<HeroState>;
+  /**
+   * Simulate holding a KeyboardEvent.code for `seconds` of game time, stepping
+   * the game synchronously. Returns the hero state when the key is released.
+   *
+   * Synchronous on purpose. The previous Promise-and-setTimeout version could
+   * not work in a hidden tab, where Chrome starves requestAnimationFrame and
+   * clamps timers to about once a minute: nothing stepped, and awaiting it hung
+   * for 45 s. This version drives the loop itself, so it is deterministic and
+   * cannot hang regardless of tab state.
+   */
+  simulate: (code: string, seconds: number, dt?: number) => HeroState;
   /** Is terrain between the camera and the hero, here and now? */
   occlusion: () => ReturnType<typeof occlusionAt>;
+  /** What is actually in frame here: Shim's size, ground extents, rock share. */
+  framing: () => ReturnType<typeof framingAt>;
 };
 
 const ZONE_NAMES: Record<string, string> = {
@@ -82,7 +94,7 @@ export class Game {
     if (debug) this.stats.toggle();
 
     this.scene.background = new THREE.Color(CONFIG.sky.noon);
-    this.scene.fog = new THREE.Fog(CONFIG.sky.noon, 60, 260);
+    this.scene.fog = new THREE.Fog(CONFIG.sky.noon, CONFIG.render.fogNear, CONFIG.render.fogFar);
 
     this.scene.add(buildIslandMesh());
     this.scene.add(buildWaterStandIn());
@@ -107,7 +119,7 @@ export class Game {
     this.camera.snapTo(this.hero);
   }
 
-  update(dt: number): void {
+  update(dt: number, render = true): void {
     // 1. input
     const prev = this.input;
     this.input = mergeInput(prev, [this.keyboard.poll(), this.gamepad.poll()]);
@@ -155,7 +167,7 @@ export class Game {
       device: this.input.lastDevice ?? 'none yet',
     });
 
-    this.bundle.renderer.render(this.scene, this.camera.camera);
+    if (render) this.bundle.renderer.render(this.scene, this.camera.camera);
   }
 
   /**
@@ -188,8 +200,9 @@ export class Game {
       toggleStats: () => this.stats.toggle(),
       teleport: (x, z) => game.teleport(x, z),
       teleportCell: (c, r) => game.teleport(...cellCentre(c, r)),
-      hold: (code, ms) => game.hold(code, ms),
+      simulate: (code, seconds, dt) => game.simulate(code, seconds, dt),
       occlusion: () => occlusionAt(game.hero.x, game.hero.z),
+      framing: () => framingAt(game.hero.x, game.hero.z),
     };
   }
 
@@ -209,15 +222,13 @@ export class Game {
     return this.hero;
   }
 
-  /** Debug only. Holds a key for `ms` of wall time, then releases it. */
-  private hold(code: string, ms: number): Promise<HeroState> {
+  /** Debug only. Drives the loop directly, so it works in a hidden tab. */
+  private simulate(code: string, seconds: number, dt = 1 / 60): HeroState {
+    const frames = Math.max(1, Math.round(seconds / dt));
     this.keyboard.injectDown(code);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.keyboard.injectUp(code);
-        resolve(this.hero);
-      }, ms);
-    });
+    for (let i = 0; i < frames; i++) this.update(dt, i === frames - 1);
+    this.keyboard.injectUp(code);
+    return this.hero;
   }
 
   dispose(): void {

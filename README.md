@@ -51,10 +51,13 @@ Available on every build, with or without `?debug=1`. Read-only inspection of th
 | `toggleStats()` | show or hide the overlay without a key press |
 | `teleport(x, z)` | put the hero at a world position, snapped to the ground |
 | `teleportCell(c, r)` | put the hero at the centre of a 1-based grid cell |
-| `hold(code, ms)` | hold a `KeyboardEvent.code` for `ms`, bypassing the DOM; returns a Promise |
+| `simulate(code, sec, dt?)` | simulate holding a `KeyboardEvent.code` for `sec` of game time; **synchronous**, returns hero state |
 | `occlusion()` | is terrain between the camera and the hero right now? |
+| `framing()` | what is in frame: Shim's size as a fraction of the viewport, ground extents, share of frame that is rock |
 
-`hero` is a live read-only snapshot. **To move the hero, use `teleport` — do not assign to `hero`.** `hold` injects straight into the input state rather than dispatching a `KeyboardEvent`, because synthetic events do not reach the listeners in every automation setup.
+`hero` is a live read-only snapshot. **To move the hero, use `teleport` — do not assign to `hero`.**
+
+`simulate` injects straight into the input state rather than dispatching a `KeyboardEvent`, because synthetic events do not reach the listeners in every automation setup. It is **synchronous and drives the loop itself**: an earlier Promise-and-`setTimeout` version could not work in a hidden tab, where Chrome starves `requestAnimationFrame` and clamps timers to roughly once a minute, so awaiting it hung. `simulate` cannot hang and gives the same result whatever the tab is doing. It renders only the final frame, so a two-second walk costs about as much as two frames.
 
 Useful one-liners:
 
@@ -70,8 +73,12 @@ console.log(__stillworks.renderer.info.render);
 console.log(__stillworks.hero.x / 10, __stillworks.hero.z / 10);
 
 // Walk north for two seconds and report where you ended up.
-await __stillworks.hold('KeyW', 2000);
-console.log(__stillworks.hero);
+console.log(__stillworks.simulate('KeyW', 2));
+
+// Is the composition right here?
+console.log(__stillworks.framing());
+// -> { shimFraction: 0.037, groundWidthM: 45, groundDepthM: 35,
+//      rockFraction: 0.04, highestRiseM: 7, skyVisible: false, ... }
 
 // Stand at Bram's spot on the Warm Stones and check the camera has a clear view.
 __stillworks.teleportCell(11, 7);

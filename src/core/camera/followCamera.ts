@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../config';
 import { damp } from '../math/damp';
-import { cameraOffset, liftAboveGround } from './occlusion';
+import { cameraOffset, resolveCamera } from './occlusion';
 import type { HeroState } from '../../entities/shim/heroController';
 
 export class FollowCamera {
@@ -21,6 +21,7 @@ export class FollowCamera {
   private readonly offset = new THREE.Vector3();
   private lookAheadX = 0;
   private lookAheadZ = 0;
+  private dolly = 1;
 
   constructor() {
     const { fovDeg, near, far, yawDeg } = CONFIG.camera;
@@ -34,11 +35,20 @@ export class FollowCamera {
     this.offset.set(ox, oy, oz);
   }
 
-  /** Places the camera at target + offset, lifted clear of the ground. */
-  private place(): void {
-    const x = this.target.x + this.offset.x;
-    const z = this.target.z + this.offset.z;
-    this.camera.position.set(x, liftAboveGround(x, this.target.y + this.offset.y, z), z);
+  /**
+   * Places the camera, dollying in and lifting where rock would otherwise sit
+   * between the lens and Shim. The dolly factor is damped so backing against a
+   * cliff is a smooth push-in rather than a jump.
+   */
+  private place(dt = 0): void {
+    const solved = resolveCamera(this.target.x, this.target.y, this.target.z);
+    this.dolly = dt > 0 ? damp(this.dolly, solved.factor, 8, dt) : solved.factor;
+
+    const x = this.target.x + this.offset.x * this.dolly;
+    const z = this.target.z + this.offset.z * this.dolly;
+    const y = this.target.y + this.offset.y * this.dolly;
+    // Re-resolve the lift at the damped position, or a mid-damp frame can clip.
+    this.camera.position.set(x, Math.max(y, solved.cy), z);
     this.camera.lookAt(this.target);
   }
 
@@ -69,7 +79,7 @@ export class FollowCamera {
       damp(this.target.z, wantZ, posDamp, dt),
     );
 
-    this.place();
+    this.place(dt);
   }
 
   /**

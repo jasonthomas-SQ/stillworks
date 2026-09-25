@@ -27,18 +27,30 @@ export const CONFIG = {
     height: 0.9,
   },
 
+  /**
+   * Camera, chosen by measurement rather than by eye — see framing.ts.
+   *
+   * The first pass (60 deg / 16 m / 38 deg) put Shim at 8.2% of frame height
+   * and, at the start cell, Fernwell and Spool Yard, rendered ZERO rock: the
+   * frame was floor edge to edge, which is what the M1 check reported. These
+   * numbers put Shim at 3.7% — inside the 3-5% target taken from the reference
+   * art — and put rock in frame at every named spot except Fernwell, where the
+   * terrain is 80 m of level ground and no camera can reach a wall (see the
+   * geometry note in framing.test.ts).
+   */
   camera: {
-    pitchDeg: 60,
+    pitchDeg: 47,
     /** Parameterised from day one so a later 90-degree rotate is a config change. */
     yawDeg: 0,
-    distance: 16,
-    fovDeg: 38,
+    distance: 32,
+    fovDeg: 42,
     posDamp: 6,
-    lookAhead: 1.2,
+    /** Scaled with distance: 1.2 m looked right at 16 m, so 2.4 m at 32 m. */
+    lookAhead: 2.4,
     near: 0.5,
     far: 400,
     /** Metres the camera keeps above the ground under it. */
-    groundClearance: 1.5,
+    groundClearance: 2,
   },
 
   clock: {
@@ -58,6 +70,12 @@ export const CONFIG = {
   },
 
   render: {
+    /**
+     * Fog. The camera now sits 32 m back and sees roughly 35 m past the hero,
+     * so the old 60 m fog start was fogging ground barely beyond Shim.
+     */
+    fogNear: 90,
+    fogFar: 340,
     dprCap: 1.5,
     shadowMapSize: 2048,
     shadowBoxHalf: 45,
