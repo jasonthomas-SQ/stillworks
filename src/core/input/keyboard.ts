@@ -28,6 +28,16 @@ const BUTTONS: Record<string, Action> = {
 
 export class Keyboard {
   private readonly down = new Set<string>();
+  /**
+   * Keys pressed since the last poll, even if already released.
+   *
+   * Polling a held-key set at frame time silently drops any press shorter than
+   * a frame — 16 ms at 60 fps. A human never types that fast, but synthetic and
+   * automation-driven key events routinely do, which is why the backtick stats
+   * toggle looked dead during the M1 visual check while the binding was fine.
+   * Latching the press means no input is ever lost, whoever sends it.
+   */
+  private readonly pressedSincePoll = new Set<string>();
   private readonly device = emptyDevice('keyboard');
   private readonly onDown: (e: KeyboardEvent) => void;
   private readonly onUp: (e: KeyboardEvent) => void;
@@ -38,6 +48,7 @@ export class Keyboard {
       if (e.repeat) return;
       if (MOVE[e.code] || BUTTONS[e.code]) e.preventDefault();
       this.down.add(e.code);
+      this.pressedSincePoll.add(e.code);
     };
     this.onUp = (e) => this.down.delete(e.code);
     // A key held while the window loses focus would otherwise stick down.
@@ -66,12 +77,18 @@ export class Keyboard {
     for (const key of Object.keys(this.device.buttons) as Action[]) {
       this.device.buttons[key] = false;
     }
+    // Held keys, plus anything pressed and released between polls.
     for (const code of this.down) {
       const action = BUTTONS[code];
       if (action) this.device.buttons[action] = true;
     }
+    for (const code of this.pressedSincePoll) {
+      const action = BUTTONS[code];
+      if (action) this.device.buttons[action] = true;
+    }
 
-    this.device.active = this.down.size > 0;
+    this.device.active = this.down.size > 0 || this.pressedSincePoll.size > 0;
+    this.pressedSincePoll.clear();
     return this.device;
   }
 
