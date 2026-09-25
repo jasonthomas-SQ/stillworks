@@ -66,7 +66,7 @@ export const CONFIG = {
     /** Tunable. Apex elevation at solar noon; never 90 or noon casts no shadow. */
     arcApexElevationDeg: 76,
     /** Tunable. Rotates the whole arc; negative rises NE and sets SW. */
-    arcAzimuthOffsetDeg: -45,
+    arcAzimuthOffsetDeg: -40,
   },
 
   render: {
