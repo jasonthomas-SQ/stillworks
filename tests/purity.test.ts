@@ -34,6 +34,19 @@ const FORBIDDEN: [RegExp, string][] = [
 
 const isPure = (text: string): boolean => text.startsWith('// @pure');
 
+/**
+ * Strip comments and string literals before scanning.
+ *
+ * Without this the guard matches prose: the word "window" in a sentence about a
+ * lit window tripped it. A purity check that punishes clear comments gets
+ * worked around rather than obeyed, which would cost more than it saves.
+ */
+const codeOnly = (text: string): string =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+    .replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+
 describe('pure files', () => {
   it('finds source files at all — an empty glob would pass everything silently', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(0);
@@ -44,8 +57,9 @@ describe('pure files', () => {
     const offenders: string[] = [];
     for (const [path, text] of Object.entries(sources)) {
       if (!isPure(text)) continue;
+      const code = codeOnly(text);
       for (const [rx, why] of FORBIDDEN) {
-        if (rx.test(text)) offenders.push(`${path} ${why}`);
+        if (rx.test(code)) offenders.push(`${path} ${why}`);
       }
     }
     expect(offenders).toEqual([]);
