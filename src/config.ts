@@ -68,7 +68,7 @@ export const CONFIG = {
     detailAmplitude: 0.12,
     detailScale: 6,
     cliffAmplitude: 1.5,
-    cliffScale: 9,
+    cliffScale: 20,
     /** Height returned south of the island: the sea floor drops away. */
     seaFloorY: -12,
     /** Height returned off the other three edges: solid rim. */

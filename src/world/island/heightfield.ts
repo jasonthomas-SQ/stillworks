@@ -151,16 +151,56 @@ function detailAt(x: number, z: number): number {
 export const MAX_DETAIL_SLOPE =
   CONFIG.terrain.detailAmplitude * FBM_MAX_GRADIENT_PER_AMPLITUDE;
 
-/** Terrain height in metres at a world position. */
+/**
+ * The continuous height field. This is what the island mesh samples at its
+ * vertices — it is not what the hero walks on. Use groundHeightAt for that.
+ */
 export function heightAt(x: number, z: number): number {
   return baseHeight(x, z) + detailAt(x, z);
 }
 
-/** Rise over run between two world positions. The only walkability rule there is. */
+const SPACING = CONFIG.units.sampleSpacing;
+
+/**
+ * Height of the RENDERED surface: the flat triangle the mesh actually draws,
+ * by barycentric lookup on the same diagonal split islandMesh uses.
+ *
+ * The hero walks on the triangles they can see, so this — not heightAt — is
+ * what the controller and the camera query. Sampling the smooth field instead
+ * left Shim's feet up to 6 cm off the drawn surface next to cliffs, where the
+ * coarse rock noise curves inside a quad. Querying the surface directly makes
+ * the agreement exact by construction rather than within a tolerance.
+ */
+export function groundHeightAt(x: number, z: number): number {
+  const qx = Math.floor(x / SPACING);
+  const qz = Math.floor(z / SPACING);
+  const fx = x / SPACING - qx;
+  const fz = z / SPACING - qz;
+
+  const x0 = qx * SPACING;
+  const z0 = qz * SPACING;
+  const h00 = heightAt(x0, z0);
+
+  // Triangle A is (0,0)-(1,0)-(1,1): the half where fz <= fx.
+  if (fz <= fx) {
+    const h10 = heightAt(x0 + SPACING, z0);
+    const h11 = heightAt(x0 + SPACING, z0 + SPACING);
+    return h00 + (h10 - h00) * fx + (h11 - h10) * fz;
+  }
+  // Triangle B is (0,0)-(1,1)-(0,1).
+  const h01 = heightAt(x0, z0 + SPACING);
+  const h11 = heightAt(x0 + SPACING, z0 + SPACING);
+  return h00 + (h11 - h01) * fx + (h01 - h00) * fz;
+}
+
+/**
+ * Rise over run between two world positions, measured on the rendered surface.
+ * The only walkability rule there is.
+ */
 export function slopeBetween(ax: number, az: number, bx: number, bz: number): number {
   const run = Math.hypot(bx - ax, bz - az);
   if (run === 0) return 0;
-  return Math.abs(heightAt(bx, bz) - heightAt(ax, az)) / run;
+  return Math.abs(groundHeightAt(bx, bz) - groundHeightAt(ax, az)) / run;
 }
 
 /** True when a step from a to b is permitted. Strict: exactly at the limit fails. */
