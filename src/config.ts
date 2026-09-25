@@ -37,6 +37,8 @@ export const CONFIG = {
     lookAhead: 1.2,
     near: 0.5,
     far: 400,
+    /** Metres the camera keeps above the ground under it. */
+    groundClearance: 1.5,
   },
 
   clock: {
@@ -91,11 +93,17 @@ export const CONFIG = {
     night: '#16222A',
   },
 
+  /**
+   * The active milestone's budget. `renderer.info` counts the shadow pass as
+   * well as the main pass, so the overlay compares against the incl-shadow
+   * ceilings — comparing a combined figure against a main-pass ceiling reported
+   * a false OVER. M2's ceilings (60 main / 100 incl shadow / 300k triangles)
+   * replace these when M2 lands.
+   */
   budget: {
-    drawCallsM1: 25,
-    trianglesM1: 80_000,
-    drawCallsM2: 60,
-    trianglesM2: 300_000,
+    drawCallsMainPass: 25,
+    drawCallsInclShadow: 45,
+    triangles: 80_000,
   },
 
   seed: 20260925,

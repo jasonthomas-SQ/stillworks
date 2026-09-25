@@ -50,17 +50,20 @@ export class StatsOverlay {
     const sorted = [...this.frames].sort((a, b) => a - b);
     const p = (q: number): number => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
 
+    // renderer.info counts the shadow pass as well as the main pass, so both
+    // figures are compared against the incl-shadow ceilings. Comparing a
+    // combined count against a main-pass ceiling reports a false OVER.
     const calls = renderer.info.render.calls;
     const tris = renderer.info.render.triangles;
-    const budgetCalls = CONFIG.budget.drawCallsM1;
-    const budgetTris = CONFIG.budget.trianglesM1;
+    const budgetCalls = CONFIG.budget.drawCallsInclShadow;
+    const budgetTris = CONFIG.budget.triangles;
 
     const mark = (value: number, ceiling: number): string =>
       value <= ceiling ? 'ok ' : 'OVER';
 
     const lines = [
-      `draw calls  ${String(calls).padStart(6)} / ${budgetCalls}   ${mark(calls, budgetCalls)}`,
-      `triangles   ${String(tris).padStart(6)} / ${budgetTris}  ${mark(tris, budgetTris)}`,
+      `draw calls  ${String(calls).padStart(6)} / ${budgetCalls}   ${mark(calls, budgetCalls)}  (incl shadow)`,
+      `triangles   ${String(tris).padStart(6)} / ${budgetTris}  ${mark(tris, budgetTris)}  (incl shadow)`,
       `frame ms    p50 ${p(0.5).toFixed(1)}  p95 ${p(0.95).toFixed(1)}`,
       `dpr         ${renderer.getPixelRatio().toFixed(2)} (cap ${CONFIG.render.dprCap})`,
       `programs    ${renderer.info.programs?.length ?? 0}`,
