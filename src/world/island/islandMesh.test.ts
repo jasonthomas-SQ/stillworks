@@ -124,6 +124,29 @@ describe('island geometry', () => {
     expect(g.colors.every((v) => v >= 0 && v <= 1)).toBe(true);
   });
 
+  // The bug that failed the M1 visual check: every triangle was wound clockwise
+  // seen from above, so the geometric normals pointed down and FrontSide culling
+  // removed the whole island. Positions, bounds and heights were all correct, so
+  // nothing else caught it. This is the assertion that would have.
+  it('winds every triangle so its normal points up', () => {
+    const { positions, triangleCount } = buildIslandGeometry();
+    let down = 0;
+    let firstBad = -1;
+    for (let t = 0; t < triangleCount; t++) {
+      const b = t * 9;
+      const ux = positions[b + 3]! - positions[b]!;
+      const uz = positions[b + 5]! - positions[b + 2]!;
+      const vx = positions[b + 6]! - positions[b]!;
+      const vz = positions[b + 8]! - positions[b + 2]!;
+      // y component of (b-a) x (c-a)
+      if (uz * vx - ux * vz <= 0) {
+        down += 1;
+        if (firstBad < 0) firstBad = t;
+      }
+    }
+    expect(down, `${down} triangles face downward, first at index ${firstBad}`).toBe(0);
+  });
+
   it('gives every face a single flat colour across its three vertices', () => {
     const g = buildIslandGeometry();
     for (let t = 0; t < 50; t++) {

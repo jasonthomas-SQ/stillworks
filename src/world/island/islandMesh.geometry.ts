@@ -22,19 +22,25 @@ export type IslandGeometryData = {
 
 /**
  * Diagonal split for the quad whose north-west corner is (qx, qz).
- * Fixed: (0,0)-(1,0)-(1,1) and (0,0)-(1,1)-(0,1). meshSurfaceHeightAt below uses
- * the same split, which is what keeps Shim's feet on the rendered surface
- * rather than on a bilinear patch that only agrees at the corners.
+ *
+ * The DIAGONAL is (0,0)-(1,1) for both triangles, and groundHeightAt splits on
+ * the same diagonal — that is what keeps Shim's feet on the rendered surface.
+ *
+ * The WINDING is counter-clockwise seen from above, so the geometric normal is
+ * +Y and the faces survive FrontSide culling. Getting this backwards renders
+ * nothing at all from an overhead camera while every test that only looks at
+ * positions still passes; it cost an entire M1 visual check. islandMesh.test.ts
+ * now asserts every normal points up.
  */
 const TRI_A: [number, number][] = [
   [0, 0],
-  [1, 0],
   [1, 1],
+  [1, 0],
 ];
 const TRI_B: [number, number][] = [
   [0, 0],
-  [1, 1],
   [0, 1],
+  [1, 1],
 ];
 
 export function buildIslandGeometry(): IslandGeometryData {
