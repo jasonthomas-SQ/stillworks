@@ -20,6 +20,9 @@ import { buildIslandMesh, buildWaterStandIn } from './world/island/islandMesh';
 import { stepHero, initialHeroState, heroCell, type HeroState } from './entities/shim/heroController';
 import { stepPose, initialPoseMemory, type PoseMemory } from './entities/shim/shimPose';
 import { ShimView } from './entities/shim/shimView';
+import { occlusionAt } from './core/camera/occlusion';
+import { groundHeightAt, isWaterAt } from './world/island/heightfield';
+import { cellCentre } from './data/kettle';
 
 /** Shape of window.__stillworks. See README, Debugging. */
 export type StillworksDebug = {
@@ -32,6 +35,14 @@ export type StillworksDebug = {
   readonly input: InputState;
   islandBounds: () => THREE.Box3 | null;
   toggleStats: () => void;
+  /** Put the hero at a world position, snapped to the ground, velocity zeroed. */
+  teleport: (x: number, z: number) => HeroState;
+  /** Put the hero at the centre of a 1-based grid cell, e.g. teleportCell(11, 7). */
+  teleportCell: (c: number, r: number) => HeroState;
+  /** Hold a KeyboardEvent.code for `ms`, bypassing the DOM. Resolves when released. */
+  hold: (code: string, ms: number) => Promise<HeroState>;
+  /** Is terrain between the camera and the hero, here and now? */
+  occlusion: () => ReturnType<typeof occlusionAt>;
 };
 
 const ZONE_NAMES: Record<string, string> = {
@@ -175,7 +186,38 @@ export class Game {
         return island ? new THREE.Box3().setFromObject(island) : null;
       },
       toggleStats: () => this.stats.toggle(),
+      teleport: (x, z) => game.teleport(x, z),
+      teleportCell: (c, r) => game.teleport(...cellCentre(c, r)),
+      hold: (code, ms) => game.hold(code, ms),
+      occlusion: () => occlusionAt(game.hero.x, game.hero.z),
     };
+  }
+
+  /** Debug only. Moves the hero without going through the controller. */
+  private teleport(x: number, z: number): HeroState {
+    this.hero = {
+      ...this.hero,
+      x,
+      z,
+      y: groundHeightAt(x, z),
+      vx: 0,
+      vz: 0,
+      speed: 0,
+      inWater: isWaterAt(x, z),
+    };
+    this.camera.snapTo(this.hero);
+    return this.hero;
+  }
+
+  /** Debug only. Holds a key for `ms` of wall time, then releases it. */
+  private hold(code: string, ms: number): Promise<HeroState> {
+    this.keyboard.injectDown(code);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this.keyboard.injectUp(code);
+        resolve(this.hero);
+      }, ms);
+    });
   }
 
   dispose(): void {

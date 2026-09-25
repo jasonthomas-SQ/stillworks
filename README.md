@@ -49,6 +49,12 @@ Available on every build, with or without `?debug=1`. Read-only inspection of th
 | `config` | every tunable |
 | `islandBounds()` | the island's world-space `THREE.Box3` |
 | `toggleStats()` | show or hide the overlay without a key press |
+| `teleport(x, z)` | put the hero at a world position, snapped to the ground |
+| `teleportCell(c, r)` | put the hero at the centre of a 1-based grid cell |
+| `hold(code, ms)` | hold a `KeyboardEvent.code` for `ms`, bypassing the DOM; returns a Promise |
+| `occlusion()` | is terrain between the camera and the hero right now? |
+
+`hero` is a live read-only snapshot. **To move the hero, use `teleport` — do not assign to `hero`.** `hold` injects straight into the input state rather than dispatching a `KeyboardEvent`, because synthetic events do not reach the listeners in every automation setup.
 
 Useful one-liners:
 
@@ -62,7 +68,26 @@ console.log(__stillworks.renderer.info.render);
 
 // Where is the hero, in Kettle's own terms?
 console.log(__stillworks.hero.x / 10, __stillworks.hero.z / 10);
+
+// Walk north for two seconds and report where you ended up.
+await __stillworks.hold('KeyW', 2000);
+console.log(__stillworks.hero);
+
+// Stand at Bram's spot on the Warm Stones and check the camera has a clear view.
+__stillworks.teleportCell(11, 7);
+console.log(__stillworks.occlusion());
+
+// Visit every zone and report any where the camera is blocked.
+const spots = { A: [5, 12], B: [7, 7], C: [11, 7], D: [7, 3], E: [3, 6], F: [2, 2] };
+for (const [zone, [c, r]] of Object.entries(spots)) {
+  __stillworks.teleportCell(c, r);
+  console.log(zone, __stillworks.occlusion());
+}
 ```
+
+Camera occlusion is also swept offline across all 74 walkable cells by
+`src/core/camera/occlusion.test.ts`, so `occlusion()` is for spot-checking a
+position by hand rather than the primary guard.
 
 ## Status
 

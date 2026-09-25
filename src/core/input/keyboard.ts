@@ -92,6 +92,22 @@ export class Keyboard {
     return this.device;
   }
 
+  /**
+   * Press a key from code, bypassing the DOM.
+   *
+   * Synthetic KeyboardEvents dispatched from page script do not reach the real
+   * listeners in every automation setup, which left an observer unable to walk
+   * the hero. This is the door that always opens. Debug only — see README.
+   */
+  injectDown(code: string): void {
+    this.down.add(code);
+    this.pressedSincePoll.add(code);
+  }
+
+  injectUp(code: string): void {
+    this.down.delete(code);
+  }
+
   dispose(target: Window = window): void {
     target.removeEventListener('keydown', this.onDown);
     target.removeEventListener('keyup', this.onUp);
