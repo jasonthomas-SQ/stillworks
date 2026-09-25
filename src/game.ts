@@ -22,6 +22,11 @@ import { stepPose, initialPoseMemory, type PoseMemory } from './entities/shim/sh
 import { ShimView } from './entities/shim/shimView';
 import { occlusionAt } from './core/camera/occlusion';
 import { framingAt } from './core/camera/framing';
+import { advanceClock, tFromHours, hoursOf } from './world/sky/dayClock';
+import { sunDirAt } from './world/sky/sunDir';
+import { skyStateAt } from './world/sky/skyPalette';
+import { Lighting } from './world/sky/lighting';
+import { SkyDome } from './world/sky/skyDome';
 import { groundHeightAt, isWaterAt } from './world/island/heightfield';
 import { cellCentre } from './data/kettle';
 
@@ -55,6 +60,12 @@ export type StillworksDebug = {
   occlusion: () => ReturnType<typeof occlusionAt>;
   /** What is actually in frame here: Shim's size, ground extents, rock share. */
   framing: () => ReturnType<typeof framingAt>;
+  /** Jump the day clock to an hour, 0-24. The visual check's main control. */
+  setHour: (hour: number) => number;
+  /** Current hour, 0-24. */
+  readonly hour: number;
+  /** Pause or resume the day clock. */
+  setClockRunning: (running: boolean) => void;
 };
 
 const ZONE_NAMES: Record<string, string> = {
@@ -76,11 +87,14 @@ export class Game {
   private readonly gamepad = new Gamepad_();
   private readonly shim = new ShimView();
   private readonly stats: StatsOverlay;
-  private readonly sun: THREE.DirectionalLight;
 
   private input: InputState = emptyInput();
   private hero: HeroState = initialHeroState();
   private poseMem: PoseMemory = initialPoseMemory();
+  private clock = tFromHours(CONFIG.clock.startHour);
+  private clockScale = 1;
+  private readonly lighting: Lighting;
+  private readonly skyDome: SkyDome;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -93,30 +107,16 @@ export class Game {
     this.stats = new StatsOverlay(uiRoot);
     if (debug) this.stats.toggle();
 
-    this.scene.background = new THREE.Color(CONFIG.sky.noon);
-    this.scene.fog = new THREE.Fog(CONFIG.sky.noon, CONFIG.render.fogNear, CONFIG.render.fogFar);
-
     this.scene.add(buildIslandMesh());
     this.scene.add(buildWaterStandIn());
     this.scene.add(this.shim.root);
 
-    // M1 lighting: one static noon sun. Replaced wholesale by the day cycle in
-    // M2. Physical units — three 0.186 is past the lighting cutover.
-    this.sun = new THREE.DirectionalLight(new THREE.Color('#FFF4E0'), 3);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(CONFIG.render.shadowMapSize, CONFIG.render.shadowMapSize);
-    this.sun.shadow.normalBias = CONFIG.render.shadowNormalBias;
-    this.scene.add(this.sun);
-    this.scene.add(this.sun.target);
-    this.scene.add(
-      new THREE.HemisphereLight(
-        new THREE.Color(CONFIG.sky.noon),
-        new THREE.Color(CONFIG.palette.fernDeep),
-        1,
-      ),
-    );
+    this.lighting = new Lighting(this.scene);
+    this.skyDome = new SkyDome();
+    this.scene.add(this.skyDome.mesh);
 
     this.camera.snapTo(this.hero);
+    this.applySky();
   }
 
   update(dt: number, render = true): void {
@@ -124,6 +124,9 @@ export class Game {
     const prev = this.input;
     this.input = mergeInput(prev, [this.keyboard.poll(), this.gamepad.poll()]);
     if (this.input.justPressed.stats) this.stats.toggle();
+    if (this.input.justPressed.hourBack) this.setHour(hoursOf(this.clock) - 1);
+    if (this.input.justPressed.hourForward) this.setHour(hoursOf(this.clock) + 1);
+    if (this.input.justPressed.pauseClock) this.clockScale = this.clockScale === 0 ? 1 : 0;
 
     // 2. hero
     const before = this.hero;
@@ -150,10 +153,11 @@ export class Game {
     this.poseMem = posed.mem;
     this.shim.write(posed.pose, this.hero.x, this.hero.y, this.hero.z, this.hero.yaw);
 
-    // 4. camera, then the shadow box that is framed on it
+    // 4. camera, then the clock and sky, then the shadow box framed on both
     this.camera.update(this.hero, dt);
-    this.sun.position.set(this.hero.x + 60, this.hero.y + 90, this.hero.z + 40);
-    this.camera.frameShadow(this.sun);
+    this.clock = advanceClock(this.clock, dt, this.clockScale);
+    this.applySky();
+    this.camera.frameShadow(this.lighting.sun);
 
     syncCameraToCanvas(this.camera.camera, this.canvas);
 
@@ -165,6 +169,9 @@ export class Game {
       height: `${this.hero.y.toFixed(2)} m`,
       speed: `${this.hero.speed.toFixed(2)} m/s${this.hero.inWater ? ' (water)' : ''}`,
       device: this.input.lastDevice ?? 'none yet',
+      hour: `${String(Math.floor(hoursOf(this.clock))).padStart(2, '0')}:${String(
+        Math.floor((hoursOf(this.clock) % 1) * 60),
+      ).padStart(2, '0')}${this.clockScale === 0 ? ' (paused)' : ''}`,
     });
 
     if (render) this.bundle.renderer.render(this.scene, this.camera.camera);
@@ -203,7 +210,35 @@ export class Game {
       simulate: (code, seconds, dt) => game.simulate(code, seconds, dt),
       occlusion: () => occlusionAt(game.hero.x, game.hero.z),
       framing: () => framingAt(game.hero.x, game.hero.z),
+      setHour: (hour) => game.setHour(hour),
+      get hour() {
+        return hoursOf(game.clock);
+      },
+      setClockRunning: (running) => {
+        game.clockScale = running ? 1 : 0;
+      },
     };
+  }
+
+  private applySky(): void {
+    const state = skyStateAt(this.clock);
+    this.lighting.apply(
+      state,
+      sunDirAt(this.clock),
+      this.scene,
+      this.hero.x,
+      this.hero.y,
+      this.hero.z,
+    );
+    this.skyDome.apply(state);
+    this.skyDome.follow(this.camera.camera);
+  }
+
+  /** Jump the clock. Returns the hour actually set. */
+  private setHour(hour: number): number {
+    this.clock = tFromHours(hour);
+    this.applySky();
+    return hoursOf(this.clock);
   }
 
   /** Debug only. Moves the hero without going through the controller. */

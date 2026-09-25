@@ -3,7 +3,17 @@
 // which device is in use — that is the whole point, and it is why the gamepad
 // path can ship untested on a machine with no gamepad attached.
 
-export type Action = 'interact' | 'cancel' | 'journal' | 'menu' | 'run' | 'stats';
+export type Action =
+  | 'interact'
+  | 'cancel'
+  | 'journal'
+  | 'menu'
+  | 'run'
+  | 'stats'
+  // Debug keys. They ship: they are how the day-night visual check is run.
+  | 'hourBack'
+  | 'hourForward'
+  | 'pauseClock';
 
 export type RawDevice = {
   kind: 'keyboard' | 'gamepad';
@@ -28,16 +38,20 @@ export type InputState = {
 
 export const DEADZONE = 0.15;
 
-const ACTIONS: Action[] = ['interact', 'cancel', 'journal', 'menu', 'run', 'stats'];
+const ACTIONS: Action[] = [
+  'interact',
+  'cancel',
+  'journal',
+  'menu',
+  'run',
+  'stats',
+  'hourBack',
+  'hourForward',
+  'pauseClock',
+];
 
-const noButtons = (): Record<Action, boolean> => ({
-  interact: false,
-  cancel: false,
-  journal: false,
-  menu: false,
-  run: false,
-  stats: false,
-});
+const noButtons = (): Record<Action, boolean> =>
+  Object.fromEntries(ACTIONS.map((a) => [a, false])) as Record<Action, boolean>;
 
 export function emptyInput(): InputState {
   return {

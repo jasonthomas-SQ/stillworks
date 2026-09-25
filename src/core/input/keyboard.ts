@@ -24,6 +24,9 @@ const BUTTONS: Record<string, Action> = {
   KeyJ: 'journal',
   Tab: 'menu',
   Backquote: 'stats',
+  BracketLeft: 'hourBack',
+  BracketRight: 'hourForward',
+  KeyP: 'pauseClock',
 };
 
 export class Keyboard {
