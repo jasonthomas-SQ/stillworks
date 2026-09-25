@@ -21,6 +21,19 @@ import { stepHero, initialHeroState, heroCell, type HeroState } from './entities
 import { stepPose, initialPoseMemory, type PoseMemory } from './entities/shim/shimPose';
 import { ShimView } from './entities/shim/shimView';
 
+/** Shape of window.__stillworks. See README, Debugging. */
+export type StillworksDebug = {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  config: typeof CONFIG;
+  stats: StatsOverlay;
+  readonly hero: HeroState;
+  readonly input: InputState;
+  islandBounds: () => THREE.Box3 | null;
+  toggleStats: () => void;
+};
+
 const ZONE_NAMES: Record<string, string> = {
   A: 'Flooded Stair',
   B: 'Fernwell',
@@ -49,11 +62,13 @@ export class Game {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     uiRoot: HTMLElement,
+    debug = false,
   ) {
     this.bundle = createRenderer(canvas);
     this.camera = new FollowCamera();
     this.keyboard = new Keyboard();
     this.stats = new StatsOverlay(uiRoot);
+    if (debug) this.stats.toggle();
 
     this.scene.background = new THREE.Color(CONFIG.sky.noon);
     this.scene.fog = new THREE.Fog(CONFIG.sky.noon, 60, 260);
@@ -130,6 +145,37 @@ export class Game {
     });
 
     this.bundle.renderer.render(this.scene, this.camera.camera);
+  }
+
+  /**
+   * Read-only handle for inspection from the browser console.
+   *
+   * This exists because the engineer on this project cannot see the screen: an
+   * observer with a browser needs a way to answer "where is the island, where
+   * is the hero, what does the camera think it is looking at" without reading
+   * the source. Hero state is a getter because it is replaced every frame.
+   * Keep this for the life of the project — see README, Debugging.
+   */
+  debugHandle(): StillworksDebug {
+    const game = this;
+    return {
+      scene: this.scene,
+      camera: this.camera.camera,
+      renderer: this.bundle.renderer,
+      config: CONFIG,
+      stats: this.stats,
+      get hero() {
+        return game.hero;
+      },
+      get input() {
+        return game.input;
+      },
+      islandBounds() {
+        const island = game.scene.getObjectByName('island');
+        return island ? new THREE.Box3().setFromObject(island) : null;
+      },
+      toggleStats: () => this.stats.toggle(),
+    };
   }
 
   dispose(): void {
