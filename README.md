@@ -17,6 +17,10 @@ Other scripts: `npm test` (Vitest, pure logic only), `npm run typecheck`, `npm r
 
 The world, characters, dialogue, reference art and UI spec live in the studio vault, not in this repo. Every character and creature is built in code from simple shapes; there are no rigged model files.
 
+## Controls
+
+Move with WASD or the arrow keys. Hold Shift to run. Backtick (`` ` ``) toggles the stats overlay. Gamepad is wired (left stick, A/B/X/Y, Start) but has not been tested on hardware.
+
 ## Status
 
-Scaffold only. Milestone 1 (foundation) is next.
+Milestone 1 (foundation) complete: the Kettle heightfield, kinematic movement with one slope rule, Shim's procedural body, the fixed follow camera and the stats overlay. Milestone 2 (living world) is next.
