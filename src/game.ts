@@ -32,6 +32,8 @@ import { groundHeightAt, isWaterAt } from './world/island/heightfield';
 import { cellCentre } from './data/kettle';
 import { AudioSystem } from './systems/audio/audioSystem';
 import { Motes } from './world/particles/motes';
+import { Ferns } from './world/vegetation/ferns';
+import { updateSway } from './world/shaders/injections';
 import { distanceToWater } from './world/island/heightfield';
 
 /** Shape of window.__stillworks. See README, Debugging. */
@@ -102,6 +104,7 @@ export class Game {
   private readonly water: Water;
   private readonly audio = new AudioSystem();
   private readonly motes = new Motes();
+  private readonly ferns = new Ferns();
   private elapsed = 0;
   private readonly lighting: Lighting;
   private readonly skyDome: SkyDome;
@@ -121,6 +124,8 @@ export class Game {
     this.water = new Water();
     this.scene.add(this.water.sea);
     this.scene.add(this.water.stream);
+    this.scene.add(this.ferns.treeFerns);
+    this.scene.add(this.ferns.groundCover);
     this.scene.add(this.motes.hushspores);
     this.scene.add(this.motes.steam);
     this.scene.add(this.shim.root);
@@ -184,6 +189,7 @@ export class Game {
     this.elapsed += dt;
     this.applySky();
     this.water.update(this.elapsed, skyStateAt(this.clock), sunDirAt(this.clock));
+    updateSway(this.elapsed);
     this.motes.update(this.elapsed, skyStateAt(this.clock));
     this.audio.update(this.hero, distanceToWater(this.hero.x, this.hero.z), skyStateAt(this.clock));
     this.camera.frameShadow(this.lighting.sun);
@@ -313,6 +319,7 @@ export class Game {
     this.water.dispose();
     this.audio.dispose();
     this.motes.dispose();
+    this.ferns.dispose();
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.stats.dispose();
     this.bundle.dispose();
