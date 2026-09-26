@@ -125,13 +125,16 @@ export const CONFIG = {
    * The active milestone's budget. `renderer.info` counts the shadow pass as
    * well as the main pass, so the overlay compares against the incl-shadow
    * ceilings — comparing a combined figure against a main-pass ceiling reported
-   * a false OVER. M2's ceilings (60 main / 100 incl shadow / 300k triangles)
-   * replace these when M2 lands.
+   * a false OVER.
+   *
+   * M2 ceilings. Measured occupancy after sky, cliffs and water: 18 main calls
+   * and 32 including the shadow pass, 70,434 triangles. The headroom is for
+   * vegetation, hushspores and steam, which are still to come.
    */
   budget: {
-    drawCallsMainPass: 25,
-    drawCallsInclShadow: 45,
-    triangles: 80_000,
+    drawCallsMainPass: 60,
+    drawCallsInclShadow: 100,
+    triangles: 300_000,
   },
 
   seed: 20260925,

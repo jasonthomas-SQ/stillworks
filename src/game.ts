@@ -16,7 +16,8 @@ import { Gamepad_ } from './core/input/gamepad';
 import { mergeInput, emptyInput, type InputState } from './core/input/merge';
 import { FollowCamera } from './core/camera/followCamera';
 import { StatsOverlay } from './core/debug/statsOverlay';
-import { buildIslandMesh, buildWaterStandIn } from './world/island/islandMesh';
+import { buildIslandMesh } from './world/island/islandMesh';
+import { Water } from './world/water/water';
 import { stepHero, initialHeroState, heroCell, type HeroState } from './entities/shim/heroController';
 import { stepPose, initialPoseMemory, type PoseMemory } from './entities/shim/shimPose';
 import { ShimView } from './entities/shim/shimView';
@@ -93,6 +94,8 @@ export class Game {
   private poseMem: PoseMemory = initialPoseMemory();
   private clock = tFromHours(CONFIG.clock.startHour);
   private clockScale = 1;
+  private readonly water: Water;
+  private elapsed = 0;
   private readonly lighting: Lighting;
   private readonly skyDome: SkyDome;
 
@@ -108,7 +111,9 @@ export class Game {
     if (debug) this.stats.toggle();
 
     this.scene.add(buildIslandMesh());
-    this.scene.add(buildWaterStandIn());
+    this.water = new Water();
+    this.scene.add(this.water.sea);
+    this.scene.add(this.water.stream);
     this.scene.add(this.shim.root);
 
     this.lighting = new Lighting(this.scene);
@@ -156,7 +161,9 @@ export class Game {
     // 4. camera, then the clock and sky, then the shadow box framed on both
     this.camera.update(this.hero, dt);
     this.clock = advanceClock(this.clock, dt, this.clockScale);
+    this.elapsed += dt;
     this.applySky();
+    this.water.update(this.elapsed, skyStateAt(this.clock), sunDirAt(this.clock));
     this.camera.frameShadow(this.lighting.sun);
 
     syncCameraToCanvas(this.camera.camera, this.canvas);
@@ -269,6 +276,7 @@ export class Game {
   dispose(): void {
     this.keyboard.dispose();
     this.shim.dispose();
+    this.water.dispose();
     this.stats.dispose();
     this.bundle.dispose();
   }
