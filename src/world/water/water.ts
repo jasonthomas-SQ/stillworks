@@ -105,7 +105,13 @@ export class Water {
 
     // One plane for the pool and the open sea. 3 m quads: the shortest wave is
     // 2.6 m, so anything coarser would alias the sines away.
-    const seaGeometry = new THREE.PlaneGeometry(420, 420, 140, 140);
+    const { planeSize, planeSegments } = CONFIG.water;
+    const seaGeometry = new THREE.PlaneGeometry(
+      planeSize,
+      planeSize,
+      planeSegments,
+      planeSegments,
+    );
     this.sea = new THREE.Mesh(seaGeometry, this.material);
     this.sea.name = 'water-sea';
     this.sea.rotation.x = -Math.PI / 2;

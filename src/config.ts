@@ -92,8 +92,14 @@ export const CONFIG = {
     dprCap: 1.5,
     shadowMapSize: 2048,
     shadowBoxHalf: 45,
-    /** Flat-shaded geometry acnes badly without this. */
-    shadowNormalBias: 0.03,
+    /**
+     * Flat-shaded geometry acnes badly without this, and the terrain now
+     * shadows itself, which is the hard case: too little and the facets
+     * stripe, too much and shadows detach from what casts them. Tuned by eye
+     * at the next check — these are a starting point, not a result.
+     */
+    shadowNormalBias: 0.06,
+    shadowBias: -0.0005,
   },
 
   terrain: {
@@ -116,6 +122,30 @@ export const CONFIG = {
     seaFloorY: -12,
     /** Height returned off the other three edges: solid rim. */
     outsideRimY: 36,
+  },
+
+  vegetation: {
+    treeFernCount: 96,
+    groundCoverCount: 5200,
+    /** World Bible §4-B: eleven tree ferns in a ring wide enough to be a room. */
+    cathedralCount: 11,
+    cathedralRadius: 8.5,
+    /** §7: fronds sway on a long slow cycle; trunks do not move. */
+    treeSway: { amplitude: 0.42, period: 7.5 },
+    /** Washing and ground cover move faster than anything else on the island. */
+    groundSway: { amplitude: 0.09, period: 3.1 },
+  },
+
+  water: {
+    /** One plane for the pool and the open sea: the gorge mouth is open. */
+    planeSize: 420,
+    /** Shortest sine is 2.6 m, so quads coarser than half that alias it away. */
+    planeSegments: 140,
+  },
+
+  particles: {
+    /** Steam is vapour: at higher alpha the plume covered half the frame. */
+    steamDensity: 0.16,
   },
 
   palette: {

@@ -26,5 +26,7 @@ void main() {
 
   gl_FragColor = vec4(clamp(tint * light, 0.0, 1.0), 0.86);
 
+  #include <colorspace_fragment>
+
   #include <fog_fragment>
 }

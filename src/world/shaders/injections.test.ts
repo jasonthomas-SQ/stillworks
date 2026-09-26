@@ -8,14 +8,25 @@ import { applySway, updateSway, swayUniforms, SWAY_ANCHOR } from './injections';
 // exactly the class of failure an engineer who cannot see the screen will miss,
 // so it gets a test that fails loudly instead.
 
-const compile = (material: THREE.Material): { vertexShader: string; uniforms: Record<string, THREE.IUniform> } => {
+/**
+ * Compile through three's REAL Lambert vertex shader, not a hand-built stub.
+ *
+ * A stub containing the chunk names we happen to inject after will always
+ * match, so it proves nothing: rename a chunk in three and the stub still
+ * passes while the shipped material silently loses its sway. Running the
+ * actual ShaderLib source means a rename fails here.
+ */
+const compile = (
+  material: THREE.Material,
+): { vertexShader: string; uniforms: Record<string, THREE.IUniform>; before: string } => {
+  const before = THREE.ShaderLib.lambert.vertexShader;
   const shader = {
-    vertexShader: THREE.ShaderChunk.common + '\n#include <common>\n#include <begin_vertex>',
-    fragmentShader: '',
+    vertexShader: before,
+    fragmentShader: THREE.ShaderLib.lambert.fragmentShader,
     uniforms: {} as Record<string, THREE.IUniform>,
   };
   material.onBeforeCompile!(shader as never, null as never);
-  return shader;
+  return { ...shader, before };
 };
 
 describe('sway injection against the pinned three', () => {
@@ -30,16 +41,27 @@ describe('sway injection against the pinned three', () => {
     expect(chunks.common).toBeDefined();
   });
 
-  it('actually rewrites the shader — a silent no-op fails here', () => {
+  it('actually rewrites three\'s own Lambert shader — a silent no-op fails here', () => {
     const m = new THREE.MeshLambertMaterial();
     applySway(m, { amplitude: 0.4, period: 7 });
     const shader = compile(m);
+
+    // The shipped source must have CHANGED. If three renames begin_vertex or
+    // common, both replaces become no-ops and this is the assertion that says so.
+    expect(shader.vertexShader).not.toBe(shader.before);
+    expect(shader.vertexShader.length).toBeGreaterThan(shader.before.length);
 
     expect(shader.vertexShader).toContain('aSwayWeight');
     expect(shader.vertexShader).toContain('aSwayPhase');
     expect(shader.vertexShader).toContain('uSwayTime');
     expect(shader.vertexShader).toContain('transformed.x +=');
     expect(shader.vertexShader).toContain('transformed.z +=');
+  });
+
+  it('finds both anchors in the real Lambert source, not just in a stub', () => {
+    const src = THREE.ShaderLib.lambert.vertexShader;
+    expect(src, 'lambert lost #include <common>').toContain('#include <common>');
+    expect(src, 'lambert lost #include <begin_vertex>').toContain('#include <begin_vertex>');
   });
 
   it('shares one clock across every swaying material', () => {

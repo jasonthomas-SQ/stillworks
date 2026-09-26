@@ -12,32 +12,31 @@ import { CONFIG } from '../../config';
 import { applySway } from '../shaders/injections';
 import { scatterPoints, ringPoints, type ScatterPoint } from './scatter';
 import { cellCentre } from '../../data/kettle';
-import { makeRng } from '../../core/math/rng';
 
 const P = CONFIG.palette;
 
-/** Adds the per-vertex sway weight the injection reads. 0 holds still. */
-function withSwayWeight(geometry: THREE.BufferGeometry, weights: number[]): void {
-  geometry.setAttribute('aSwayWeight', new THREE.Float32BufferAttribute(weights, 1));
-}
+/** A part to merge, plus how much each of its vertices sways. */
+type WeightedPart = {
+  geometry: THREE.BufferGeometry;
+  /** 0 holds still, 1 sways fully. Given the vertex in final local space. */
+  weight: (x: number, y: number, z: number) => number;
+};
 
 /**
  * A tree fern: a trunk cylinder and eight frond planes on a radial fan.
  * §4-B puts them six to nine metres with crowns overlapping.
  */
 function buildTreeFernGeometry(): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  const weights: number[] = [];
+  const parts: WeightedPart[] = [];
 
   const trunk = new THREE.CylinderGeometry(0.16, 0.26, 6.4, 7, 1);
   trunk.translate(0, 3.2, 0);
-  parts.push(trunk);
-  // Trunks do not move. The weight ramps only a little at the very top, where
-  // the crown meets the trunk, so there is no visible hinge.
-  const tp = trunk.getAttribute('position');
-  for (let i = 0; i < tp.count; i++) {
-    weights.push(Math.max(0, (tp.getY(i) - 5.4) / 1.0) * 0.25);
-  }
+  parts.push({
+    geometry: trunk,
+    // Trunks do not move. The weight ramps only a little at the very top,
+    // where the crown meets the trunk, so there is no visible hinge.
+    weight: (_x, y) => Math.max(0, (y - 5.4) / 1.0) * 0.25,
+  });
 
   for (let f = 0; f < 8; f++) {
     const frond = new THREE.PlaneGeometry(0.85, 3.4, 1, 3);
@@ -46,19 +45,15 @@ function buildTreeFernGeometry(): THREE.BufferGeometry {
     frond.rotateZ(0.2);
     frond.translate(0, 6.3, 0);
     frond.rotateY((f / 8) * Math.PI * 2);
-    parts.push(frond);
-
-    const fp = frond.getAttribute('position');
-    for (let i = 0; i < fp.count; i++) {
-      // Weight by distance from the crown centre: tips move most.
-      const r = Math.hypot(fp.getX(i), fp.getZ(i));
-      weights.push(Math.min(1, r / 2.6));
-    }
+    parts.push({
+      geometry: frond,
+      // Weight by distance from the crown axis: tips move most.
+      weight: (x, _y, z) => Math.min(1, Math.hypot(x, z) / 2.6),
+    });
   }
 
   const merged = mergeGeometries(parts);
-  withSwayWeight(merged, weights);
-  for (const p of parts) p.dispose();
+  for (const p of parts) p.geometry.dispose();
   return merged;
 }
 
@@ -76,27 +71,46 @@ function buildTuftGeometry(): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   g.computeVertexNormals();
-  withSwayWeight(g, weights);
+  g.setAttribute('aSwayWeight', new THREE.Float32BufferAttribute(weights, 1));
   return g;
 }
 
-/** Minimal geometry merge — enough for position-only parts, no addon needed. */
-function mergeGeometries(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+/**
+ * Minimal geometry merge, computing the sway weight per FINAL vertex.
+ *
+ * The weights must be produced after toNonIndexed(), not before it. Building
+ * them from the indexed vertex count gave aSwayWeight 110 entries against 228
+ * positions: the shader then read past the end of the buffer for most crown
+ * vertices and displaced them out of frame, while the shadow pass — which uses
+ * three's own depth material and carries no injection — kept drawing them. The
+ * result was tree ferns visible only as their own shadows.
+ */
+function mergeGeometries(parts: WeightedPart[]): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
+  const weights: number[] = [];
+
   for (const part of parts) {
-    const nonIndexed = part.index ? part.toNonIndexed() : part;
+    const nonIndexed = part.geometry.index
+      ? part.geometry.toNonIndexed()
+      : part.geometry;
     const p = nonIndexed.getAttribute('position');
     const n = nonIndexed.getAttribute('normal');
     for (let i = 0; i < p.count; i++) {
-      positions.push(p.getX(i), p.getY(i), p.getZ(i));
+      const x = p.getX(i);
+      const y = p.getY(i);
+      const z = p.getZ(i);
+      positions.push(x, y, z);
       normals.push(n ? n.getX(i) : 0, n ? n.getY(i) : 1, n ? n.getZ(i) : 0);
+      weights.push(Math.min(1, Math.max(0, part.weight(x, y, z))));
     }
-    if (nonIndexed !== part) nonIndexed.dispose();
+    if (nonIndexed !== part.geometry) nonIndexed.dispose();
   }
+
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  g.setAttribute('aSwayWeight', new THREE.Float32BufferAttribute(weights, 1));
   return g;
 }
 
@@ -168,7 +182,7 @@ export class Ferns {
 
     const stands = scatterPoints({
       seed: CONFIG.seed + 301,
-      count: 96,
+      count: CONFIG.vegetation.treeFernCount,
       zones: ['B'],
       maxGradient: 0.35,
       minScale: 0.85,
@@ -178,14 +192,19 @@ export class Ferns {
     });
 
     // §4-B: eleven tree ferns in a ring wide enough to be a room, at c7 r7.
-    const cathedral = ringPoints(...cellCentre(7, 7), 8.5, 11, CONFIG.seed + 302);
+    const cathedral = ringPoints(
+      ...cellCentre(7, 7),
+      CONFIG.vegetation.cathedralRadius,
+      CONFIG.vegetation.cathedralCount,
+      CONFIG.seed + 302,
+    );
 
     const treeMaterial = new THREE.MeshLambertMaterial({
       color: new THREE.Color(P.fernDeep),
       flatShading: true,
       side: THREE.DoubleSide,
     });
-    applySway(treeMaterial, { amplitude: 0.42, period: 7.5 });
+      applySway(treeMaterial, CONFIG.vegetation.treeSway);
 
     const treePoints = [...stands, ...cathedral];
     this.treeFernCount = treePoints.length;
@@ -194,7 +213,7 @@ export class Ferns {
 
     const groundPoints = scatterPoints({
       seed: CONFIG.seed + 303,
-      count: 5200,
+      count: CONFIG.vegetation.groundCoverCount,
       // Zone C is deliberately absent. §4-C has the Warm Stones as dry pale
       // rock with ferns drying ON it, not moss growing out of it — it is the
       // one place on Kettle where nothing is wet.
@@ -206,14 +225,12 @@ export class Ferns {
     });
     this.groundCoverCount = groundPoints.length;
 
-    const rng = makeRng(CONFIG.seed + 304);
-    void rng;
     const groundMaterial = new THREE.MeshLambertMaterial({
       color: new THREE.Color(P.mossLight),
       flatShading: true,
       side: THREE.DoubleSide,
     });
-    applySway(groundMaterial, { amplitude: 0.09, period: 3.1 });
+    applySway(groundMaterial, CONFIG.vegetation.groundSway);
 
     // Ground cover never casts: a shadow pass re-draws the scene, and 5,200
     // tufts are not worth doubling it for.

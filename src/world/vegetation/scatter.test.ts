@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { scatterPoints, ringPoints } from './scatter';
 import { tokenAt, gradientAt, groundHeightAt } from '../island/heightfield';
 import { cellCentre } from '../../data/kettle';
@@ -108,11 +109,68 @@ describe('ferns in the scene', () => {
     expect(ferns.groundCover.castShadow).toBe(false);
   });
 
-  it('carries the sway attributes the injection reads', () => {
+  // The bug that made tree ferns render as nothing but their own shadows:
+  // aSwayWeight had 110 entries against 228 positions, because the weights were
+  // built from the INDEXED vertex count before toNonIndexed() expanded it. The
+  // shader then read past the end of the buffer and displaced most crown
+  // vertices out of frame, while the shadow pass — three's depth material,
+  // which carries no injection — kept drawing them.
+  it('gives every vertex a sway weight and every instance a phase', () => {
     for (const m of [ferns.treeFerns, ferns.groundCover]) {
-      expect(m.geometry.getAttribute('aSwayWeight'), `${m.name} weight`).toBeDefined();
-      expect(m.geometry.getAttribute('aSwayPhase'), `${m.name} phase`).toBeDefined();
+      const position = m.geometry.getAttribute('position');
+      const weight = m.geometry.getAttribute('aSwayWeight');
+      const phase = m.geometry.getAttribute('aSwayPhase');
+
+      expect(weight, `${m.name} has no aSwayWeight`).toBeDefined();
+      expect(phase, `${m.name} has no aSwayPhase`).toBeDefined();
+      expect(weight!.count, `${m.name} weight count`).toBe(position.count);
+      expect(phase!.count, `${m.name} phase count`).toBe(m.count);
+      expect(weight!.itemSize).toBe(1);
     }
+  });
+
+  it('gives every vertex attribute the same count as position', () => {
+    // Any per-vertex attribute shorter than position reads out of bounds in the
+    // shader, and WebGL does not complain.
+    for (const m of [ferns.treeFerns, ferns.groundCover]) {
+      const position = m.geometry.getAttribute('position');
+      for (const [name, attr] of Object.entries(m.geometry.attributes)) {
+        if (attr instanceof THREE.InstancedBufferAttribute) continue;
+        expect(attr.count, `${m.name}.${name}`).toBe(position.count);
+      }
+    }
+  });
+
+  // Requested at the M2 check. An InstancedMesh's default bounding sphere is
+  // the BASE geometry's, sitting at the origin, so a frustum test against it
+  // culls the whole field from most camera positions while the shadow pass,
+  // using a different camera, keeps drawing it.
+  it('bounds every instance, or disables culling outright', () => {
+    for (const m of [ferns.treeFerns, ferns.groundCover]) {
+      if (m.frustumCulled === false) continue;
+
+      m.computeBoundingSphere();
+      const sphere = m.boundingSphere!;
+      const mat = new THREE.Matrix4();
+      const pos = new THREE.Vector3();
+      const base = m.geometry.boundingSphere ?? (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere!);
+      for (let i = 0; i < m.count; i++) {
+        m.getMatrixAt(i, mat);
+        pos.setFromMatrixPosition(mat);
+        expect(
+          sphere.center.distanceTo(pos) + base.radius,
+          `${m.name} instance ${i} outside the bounding sphere`,
+        ).toBeLessThanOrEqual(sphere.radius + 1e-3);
+      }
+    }
+  });
+
+  it('turns culling off on the instanced fields, with the reason recorded', () => {
+    // Cheaper and safer than maintaining a sphere over thousands of instances:
+    // both fields cover most of the island anyway, so they would almost never
+    // be culled even when the bounds are right.
+    expect(ferns.treeFerns.frustumCulled).toBe(false);
+    expect(ferns.groundCover.frustumCulled).toBe(false);
   });
 
   // §7: "Fern fronds sway on a long slow cycle" — and the trunks do not.

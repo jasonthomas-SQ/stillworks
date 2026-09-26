@@ -10,4 +10,6 @@ void main() {
 
   float edge = 1.0 - smoothstep(0.12, 0.25, r);
   gl_FragColor = vec4(uColour, vAlpha * edge);
+
+  #include <colorspace_fragment>
 }

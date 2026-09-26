@@ -24,7 +24,7 @@ export class Lighting {
     this.sun.shadow.mapSize.set(CONFIG.render.shadowMapSize, CONFIG.render.shadowMapSize);
     // Flat-shaded geometry acnes badly without this.
     this.sun.shadow.normalBias = CONFIG.render.shadowNormalBias;
-    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.bias = CONFIG.render.shadowBias;
     scene.add(this.sun);
     scene.add(this.sun.target);
 

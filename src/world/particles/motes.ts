@@ -173,7 +173,7 @@ export class Motes {
     s.uTime!.value = elapsed;
     // Steam is always on; the vents do not care what hour it is. Low alpha:
     // it is vapour, and at full opacity the plume covered half the frame.
-    s.uDensity!.value = 0.16;
+    s.uDensity!.value = CONFIG.particles.steamDensity;
     // White at noon, gold at dusk: the sun colour, lifted so it stays pale.
     (s.uColour!.value as THREE.Color)
       .setRGB(state.sunColour[0], state.sunColour[1], state.sunColour[2], THREE.SRGBColorSpace)

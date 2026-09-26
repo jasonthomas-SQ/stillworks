@@ -10,4 +10,6 @@ void main() {
   float t = smoothstep(0.42, 0.98, h);
   float banded = floor(t * 5.0 + 0.5) / 5.0;
   gl_FragColor = vec4(mix(uHorizon, uZenith, banded), 1.0);
+
+  #include <colorspace_fragment>
 }

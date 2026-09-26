@@ -21,7 +21,10 @@ export function buildIslandMesh(): THREE.Mesh {
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'island';
-  mesh.castShadow = false; // the terrain is the shadow receiver, not a caster
+  // World Bible §7 wants one shadow-casting sun through cliff geometry: the
+  // walls must actually shade the floor on screen, not just in the light probe.
+  // With this false the probe was guarding geometry the renderer never drew.
+  mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
 }
