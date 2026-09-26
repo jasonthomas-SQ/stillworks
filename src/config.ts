@@ -132,6 +132,11 @@ export const CONFIG = {
     cathedralRadius: 8.5,
     /** §7: fronds sway on a long slow cycle; trunks do not move. */
     treeSway: { amplitude: 0.42, period: 7.5 },
+    /**
+     * Radius of the corridor kept clear between the camera and Shim, in metres.
+     * Shim is 0.9 m, so 2.5 m clears the silhouette with generous margin.
+     */
+    sightLineRadius: 2.5,
     /** Washing and ground cover move faster than anything else on the island. */
     groundSway: { amplitude: 0.09, period: 3.1 },
   },

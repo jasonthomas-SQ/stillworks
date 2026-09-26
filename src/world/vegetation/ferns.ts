@@ -204,7 +204,8 @@ export class Ferns {
       flatShading: true,
       side: THREE.DoubleSide,
     });
-      applySway(treeMaterial, CONFIG.vegetation.treeSway);
+      // Only the tall crowns fade: ground tufts are never between lens and hero.
+    applySway(treeMaterial, { ...CONFIG.vegetation.treeSway, fadeFromSightLine: true });
 
     const treePoints = [...stands, ...cathedral];
     this.treeFernCount = treePoints.length;

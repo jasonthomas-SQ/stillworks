@@ -33,7 +33,7 @@ import { cellCentre } from './data/kettle';
 import { AudioSystem } from './systems/audio/audioSystem';
 import { Motes } from './world/particles/motes';
 import { Ferns } from './world/vegetation/ferns';
-import { updateSway } from './world/shaders/injections';
+import { updateSway, updateSightLine } from './world/shaders/injections';
 import { distanceToWater } from './world/island/heightfield';
 
 /** Shape of window.__stillworks. See README, Debugging. */
@@ -190,6 +190,14 @@ export class Game {
     this.applySky();
     this.water.update(this.elapsed, skyStateAt(this.clock), sunDirAt(this.clock));
     updateSway(this.elapsed);
+    // Canopy fade: the fronds between the lens and Shim stipple away, so Shim
+    // can walk under the tree ferns and still be readable.
+    const cam = this.camera.camera.position;
+    updateSightLine(
+      [cam.x, cam.y, cam.z],
+      [this.hero.x, this.hero.y + CONFIG.hero.height * 0.6, this.hero.z],
+      CONFIG.vegetation.sightLineRadius,
+    );
     // Point sprites are world-scaled, so they need the real drawing buffer
     // height and the camera FOV. Cheap, and it survives a resize or a DPR
     // change without a listener.

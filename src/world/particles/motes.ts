@@ -29,6 +29,8 @@ export type MoteOptions = {
   maxPixels: number;
   /** Fraction of the life at which the fade-out begins. */
   fadeStart: number;
+  /** Width of the spawn scatter around each bank or vent, in metres. */
+  spawnSpread: number;
   additive: boolean;
 };
 
@@ -44,8 +46,9 @@ function buildPoints(
 
   for (let i = 0; i < opts.count; i++) {
     const [bx, bz] = spawns[Math.floor(rng() * spawns.length)]!;
-    const x = bx + (rng() - 0.5) * 9;
-    const z = bz + (rng() - 0.5) * 9;
+    const spread = opts.spawnSpread;
+    const x = bx + (rng() - 0.5) * spread;
+    const z = bz + (rng() - 0.5) * spread;
     positions[i * 3] = x;
     positions[i * 3 + 1] = 0; // replaced in the shader by aSpawnY + rise
     positions[i * 3 + 2] = z;
@@ -110,6 +113,7 @@ export function buildHushspores(): THREE.Points {
     sizeEnd: 0.06,
     maxPixels: 8,
     fadeStart: 0.55,
+    spawnSpread: 9,
     additive: true,
   });
   points.name = 'hushspores';
@@ -138,10 +142,14 @@ export function buildSteam(): THREE.Points {
     // A plume element leaves the vent about Shim's size and spreads as it
     // climbs. §7: "slow soft plumes that rise eight to twelve metres and thin
     // out" — thinning is the growth plus the long fade, not a hard cut.
-    sizeStart: 1.1,
-    sizeEnd: 3.2,
-    maxPixels: 140,
-    fadeStart: 0.25,
+    // Tightened at the M2 re-check: at a 9 m spread and a 3.2 m top size the
+    // steam read as bright discs scattered across the whole shelf rather than
+    // plumes rising from vents. 2.5 m of spread and a 2.1 m top gives columns.
+    sizeStart: 1.0,
+    sizeEnd: 2.1,
+    maxPixels: 110,
+    fadeStart: 0.2,
+    spawnSpread: 2.5,
     additive: false,
   });
   points.name = 'steam';
