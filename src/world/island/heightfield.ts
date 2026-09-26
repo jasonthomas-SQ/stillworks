@@ -90,9 +90,66 @@ function blend(
   return top + (bottom - top) * tz;
 }
 
-/** Bilinear blend of the four surrounding cell centres. No detail layer. */
+/**
+ * Sharpen the blend parameter across a walkable/cliff boundary.
+ *
+ * Plain bilinear spreads a 10 m height change across a whole 10 m cell, which
+ * is a 45-degree slope — the M1 check read the result as "an eroded sandy
+ * valley, not cut green rock", and it was right. Compressing the change into a
+ * narrow band at the cell boundary leaves flat ground either side and a steep
+ * face between, which is what a cut in the rock looks like.
+ *
+ * Only walkable-to-cliff pairs are sharpened. Walkable-to-walkable stays linear,
+ * so the Northstair's flights and the terrace climb keep the exact gradients
+ * the authored heights specify and the slope rule behaves as designed.
+ *
+ * This is the "cliff skirt" Odin pre-approved, done in the height field rather
+ * than as separate quads: a skirt laid over a 10 m ramp would still have the
+ * ramp visible on both sides of it.
+ */
+function sharpen(t: number, aCliff: boolean, bCliff: boolean): number {
+  if (aCliff === bCliff) return t;
+  const w = CONFIG.terrain.cliffFaceWidth / (2 * CELL);
+  // Piecewise LINEAR, not smoothstep. Smoothstep has curvature, and a flat
+  // mesh cannot follow a curve: at a 2.5 m face it put the drawn surface 2.7 m
+  // away from the field the hero queries. A clamped linear ramp has zero
+  // curvature, and with an even face width its two kinks land exactly on mesh
+  // vertices, so the triangles reproduce it without error.
+  return clamp((t - (0.5 - w)) / (2 * w), 0, 1);
+}
+
+/** Bilinear blend of the four surrounding cell centres, with cut cliff faces. */
 function baseHeight(x: number, z: number): number {
-  return blend(x, z, cellHeight);
+  const { c0, r0, tx, tz } = patch(x, z);
+
+  const h00 = cellHeight(c0, r0);
+  const h10 = cellHeight(c0 + 1, r0);
+  const h01 = cellHeight(c0, r0 + 1);
+  const h11 = cellHeight(c0 + 1, r0 + 1);
+
+  const k00 = isCliffCell(c0, r0);
+  const k10 = isCliffCell(c0 + 1, r0);
+  const k01 = isCliffCell(c0, r0 + 1);
+  const k11 = isCliffCell(c0 + 1, r0 + 1);
+
+  const top = h00 + (h10 - h00) * sharpen(tx, k00, k10);
+  const bottom = h01 + (h11 - h01) * sharpen(tx, k01, k11);
+
+  // z is deliberately NOT sharpened.
+  //
+  // A first attempt sharpened both axes and chose the z remap from the four
+  // corners' cliffness. That predicate differs between neighbouring patches
+  // that share a column, so the field became DISCONTINUOUS at cell centres —
+  // measured a 3.4 m jump across x=45. A discontinuous height field is far
+  // worse than a smooth one: the slope rule spikes and the mesh tears.
+  //
+  // Sharpening x alone is continuous by construction, because sharpen(0)=0 and
+  // sharpen(1)=1 at the cell centres where patches meet. Kettle is a
+  // north-south gorge, so its long walls are the east- and west-facing ones —
+  // exactly the faces this sharpens, and exactly the ones the fixed camera
+  // looks at. North-south faces stay linear; if they read as slopes, skirt
+  // quads on those boundaries are the next step.
+  return top + (bottom - top) * tz;
 }
 
 /**

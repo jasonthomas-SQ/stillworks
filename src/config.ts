@@ -87,6 +87,16 @@ export const CONFIG = {
     /** fBm detail on gentle ground, gradient-gated so ramps stay walkable. */
     detailAmplitude: 0.12,
     detailScale: 6,
+    /**
+     * Width of a cut cliff face, in metres. The height change between a
+     * walkable cell and a cliff cell is compressed into this band at the cell
+     * boundary, leaving flat ground either side. A 10 m rise over 4 m is about
+     * 68 degrees, which reads as cut rock rather than an eroded slope.
+     *
+     * Keep it an EVEN multiple of units.sampleSpacing: the ramp's two kinks then
+     * land on mesh vertices and the drawn triangles reproduce the field exactly.
+     */
+    cliffFaceWidth: 4,
     cliffAmplitude: 1.5,
     cliffScale: 20,
     /** Height returned south of the island: the sea floor drops away. */
