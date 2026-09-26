@@ -294,6 +294,31 @@ export function surfaceNormalAt(x: number, z: number): [number, number, number] 
   return [-gx / len, 1 / len, -gz / len];
 }
 
+/**
+ * Distance to the nearest water, in metres. Used for the water ambience gain.
+ *
+ * The seven water cells plus the sea south of the island; the stream channel is
+ * inside Fernwell so the floor is never far from running water, which is what
+ * §7's "always audible" asks for.
+ */
+export function distanceToWater(x: number, z: number): number {
+  let best = Infinity;
+  for (let r = 1; r <= GRID; r++) {
+    for (let c = 1; c <= GRID; c++) {
+      if (tokenAtCell(c, r) !== '~') continue;
+      best = Math.min(best, Math.hypot(x - (c - 0.5) * CELL, z - (r - 0.5) * CELL));
+    }
+  }
+  // The stream runs the length of Fernwell from r5 into the pool.
+  for (let sz = 45; sz <= 112; sz += 4) {
+    const t = (sz - 45) / (112 - 45);
+    best = Math.min(best, Math.hypot(x - (65 - 5 * t), z - sz));
+  }
+  // The open sea, south of the island.
+  best = Math.min(best, Math.max(0, ISLAND_M + 5 - z));
+  return best;
+}
+
 /** Base-surface gradient magnitude, exposed for terrain colouring. */
 export function gradientAt(x: number, z: number): number {
   return baseGradient(x, z);

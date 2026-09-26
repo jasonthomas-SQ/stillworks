@@ -30,6 +30,8 @@ import { Lighting } from './world/sky/lighting';
 import { SkyDome } from './world/sky/skyDome';
 import { groundHeightAt, isWaterAt } from './world/island/heightfield';
 import { cellCentre } from './data/kettle';
+import { AudioSystem } from './systems/audio/audioSystem';
+import { distanceToWater } from './world/island/heightfield';
 
 /** Shape of window.__stillworks. See README, Debugging. */
 export type StillworksDebug = {
@@ -67,6 +69,8 @@ export type StillworksDebug = {
   readonly hour: number;
   /** Pause or resume the day clock. */
   setClockRunning: (running: boolean) => void;
+  /** Audio state, so a check can confirm the gesture unlock without ears. */
+  readonly audio: { readonly unlocked: boolean; readonly blocked: boolean };
 };
 
 const ZONE_NAMES: Record<string, string> = {
@@ -95,6 +99,7 @@ export class Game {
   private clock = tFromHours(CONFIG.clock.startHour);
   private clockScale = 1;
   private readonly water: Water;
+  private readonly audio = new AudioSystem();
   private elapsed = 0;
   private readonly lighting: Lighting;
   private readonly skyDome: SkyDome;
@@ -122,6 +127,17 @@ export class Game {
 
     this.camera.snapTo(this.hero);
     this.applySky();
+
+    // Browsers hold the audio context until a genuine gesture, so the first
+    // input of any kind is the unlock. Once only.
+    const unlock = (): void => {
+      void this.audio.unlock();
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('pointerdown', unlock);
+    };
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', unlock);
+    document.addEventListener('visibilitychange', this.onVisibility);
   }
 
   update(dt: number, render = true): void {
@@ -164,6 +180,7 @@ export class Game {
     this.elapsed += dt;
     this.applySky();
     this.water.update(this.elapsed, skyStateAt(this.clock), sunDirAt(this.clock));
+    this.audio.update(this.hero, distanceToWater(this.hero.x, this.hero.z), skyStateAt(this.clock));
     this.camera.frameShadow(this.lighting.sun);
 
     syncCameraToCanvas(this.camera.camera, this.canvas);
@@ -221,11 +238,23 @@ export class Game {
       get hour() {
         return hoursOf(game.clock);
       },
+      audio: {
+        get unlocked() {
+          return game.audio.unlocked;
+        },
+        get blocked() {
+          return game.audio.blocked;
+        },
+      },
       setClockRunning: (running) => {
         game.clockScale = running ? 1 : 0;
       },
     };
   }
+
+  private readonly onVisibility = (): void => {
+    this.audio.setTabVisible(!document.hidden);
+  };
 
   private applySky(): void {
     const state = skyStateAt(this.clock);
@@ -277,6 +306,8 @@ export class Game {
     this.keyboard.dispose();
     this.shim.dispose();
     this.water.dispose();
+    this.audio.dispose();
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.stats.dispose();
     this.bundle.dispose();
   }
