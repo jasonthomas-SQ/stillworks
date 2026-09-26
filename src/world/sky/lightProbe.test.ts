@@ -16,7 +16,8 @@ import { cellCentre } from '../../data/kettle';
 const TERRACE = cellCentre(3, 6); // Pell, Canopy Walk
 const LOFT = cellCentre(2, 3); // Ossa, Winding Loft
 const FLOOR = cellCentre(7, 7); // Fernwell, the Fern Cathedral
-const WARM = cellCentre(10, 7); // the Warm Stones vents
+const WARM = cellCentre(10, 7); // the Warm Stones vents, landmark d05
+const BRAM = cellCentre(11, 7); // Bram's spot on the shelf top, d04
 const YARD = cellCentre(7, 3); // Spool Yard
 const STAIR = cellCentre(6, 11); // the Flooded Stair
 
@@ -92,6 +93,33 @@ describe('the gorge light sequence (World Bible §7)', () => {
   // beat is the signature one and carries a character, so it wins until
   // Marlowe rules. This test asserts the CURRENT behaviour so the day the
   // ruling lands, it fails and somebody has to look at it.
+  // RECORDED CONSEQUENCE of Marlowe's narrowing ruling, 26/09/2026.
+  //
+  // The new rock spur at c9r9 sits south-west of the Warm Stones, which is the
+  // direction the dusk beam arrives from. It shadows the shelf TOP (c11r7,
+  // where Bram stands) about 0.6 h before the vents (c10r7, landmark d05) lose
+  // it. §4-C's beat is "the last hour of sun lies right across the vents", and
+  // the vents do hold it — but Bram is in shade for the final stretch, which is
+  // the opposite of what higher ground would normally do.
+  //
+  // The spur cannot simply be lowered: Marlowe set a floor of 10 m above the
+  // Fernwell floor for it, and at that floor the beam is still blocked. Flagged
+  // rather than fixed, because the fix is Marlowe's to choose.
+  it('records that Bram loses the last sun before the vents do', () => {
+    const late = tFromHours(lateDuskProbeHour());
+    expect(inDirectSun(...WARM, late), 'vents at c10r7').toBe(true);
+    expect(inDirectSun(...BRAM, late), "Bram's spot at c11r7").toBe(false);
+
+    // Both still hold the dusk hour itself, which is the beat that matters.
+    const dusk = tFromHours(duskProbeHour());
+    expect(inDirectSun(...WARM, dusk)).toBe(true);
+    expect(inDirectSun(...BRAM, dusk)).toBe(true);
+
+    const gap = litWindowFor(...WARM).end - litWindowFor(...BRAM).end;
+    expect(gap).toBeGreaterThan(0);
+    expect(gap).toBeLessThan(1.5);
+  });
+
   it('records that the Flooded Stair shares the Warm Stones dusk beam', () => {
     const t = tFromHours(lateDuskProbeHour());
     expect(inDirectSun(...STAIR, t)).toBe(true);

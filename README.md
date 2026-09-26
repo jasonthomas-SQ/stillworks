@@ -19,7 +19,7 @@ The world, characters, dialogue, reference art and UI spec live in the studio va
 
 ## Controls
 
-Move with WASD or the arrow keys. Hold Shift to run. Backtick (`` ` ``) toggles the stats overlay. Gamepad is wired (left stick, A/B/X/Y, Start) but has not been tested on hardware.
+Move with WASD or the arrow keys. Hold Shift to run. Backtick (`` ` ``) toggles the stats overlay. `[` and `]` step the day clock back and forward an hour, `P` pauses it — these ship, because they are how the day-night check is run. Gamepad is wired (left stick, A/B/X/Y, Start) but has not been tested on hardware.
 
 ## Debugging
 
@@ -54,6 +54,9 @@ Available on every build, with or without `?debug=1`. Read-only inspection of th
 | `simulate(code, sec, dt?)` | simulate holding a `KeyboardEvent.code` for `sec` of game time; **synchronous**, returns hero state |
 | `occlusion()` | is terrain between the camera and the hero right now? |
 | `framing()` | what is in frame: Shim's size as a fraction of the viewport, ground extents, share of frame that is rock |
+| `setHour(h)` | jump the day clock to an hour, 0-24; returns the hour set |
+| `hour` | current hour, 0-24 |
+| `setClockRunning(b)` | pause or resume the day clock |
 
 `hero` is a live read-only snapshot. **To move the hero, use `teleport` — do not assign to `hero`.**
 
@@ -77,6 +80,9 @@ console.log(__stillworks.simulate('KeyW', 2));
 
 // Is the composition right here?
 console.log(__stillworks.framing());
+
+// Walk the day. Dawn, noon, dusk, night.
+for (const h of [6.3, 12, 18.5, 23]) { __stillworks.setHour(h); /* screenshot */ }
 // -> { shimFraction: 0.037, groundWidthM: 45, groundDepthM: 35,
 //      rockFraction: 0.04, highestRiseM: 7, skyVisible: false, ... }
 
