@@ -76,7 +76,7 @@ describe('hushspores', () => {
 
   it('is one draw call with no per-particle CPU work', () => {
     expect(points).toBeInstanceOf(THREE.Points);
-    expect(points.geometry.getAttribute('position').count).toBe(500);
+    expect(points.geometry.getAttribute('position').count).toBe(320);
   });
 
   it('is deterministic', () => {
@@ -96,6 +96,48 @@ describe('steam', () => {
       expect(pos.getZ(i), `mote ${i} z`).toBeGreaterThan(50);
       expect(pos.getZ(i), `mote ${i} z`).toBeLessThan(85);
     }
+  });
+
+  // The M2 check found steam discs two to three times Shim's height and spores
+  // at 15-30 px against a 0.06 m spec. Cause: gl_PointSize used a bare magic
+  // constant with no viewport or FOV term, so nothing was world-scaled at all.
+  it('sizes motes in metres, not pixels', () => {
+    const spore = buildHushspores().material as THREE.ShaderMaterial;
+    const steam = buildSteam().material as THREE.ShaderMaterial;
+
+    // §3 gives hushspores at 0.06 m.
+    expect(spore.uniforms.uSizeStart!.value).toBeCloseTo(0.06, 6);
+    expect(spore.uniforms.uSizeEnd!.value).toBeCloseTo(0.06, 6);
+    // A plume element leaves the vent about Shim's size and spreads.
+    expect(steam.uniforms.uSizeStart!.value).toBeGreaterThan(CONFIG.hero.height * 0.8);
+    expect(steam.uniforms.uSizeStart!.value).toBeLessThan(CONFIG.hero.height * 1.6);
+    expect(steam.uniforms.uSizeEnd!.value).toBeGreaterThan(
+      steam.uniforms.uSizeStart!.value as number,
+    );
+  });
+
+  it('draws a spore as a glint and never as a disc', () => {
+    // At the shipped camera: Shim is 0.9 m, a spore 0.06 m, so a spore must be
+    // about a fifteenth of Shim's on-screen height.
+    const motes = new Motes();
+    const height = 1080; // drawing buffer at 720 CSS px and DPR 1.5
+    motes.setViewport(height, CONFIG.camera.fovDeg);
+    const scale = (motes.hushspores.material as THREE.ShaderMaterial).uniforms.uPixelScale!
+      .value as number;
+    const depth = CONFIG.camera.distance;
+
+    const sporePx = (0.06 * scale) / depth;
+    const shimPx = (CONFIG.hero.height * scale) / depth;
+    expect(sporePx).toBeGreaterThan(1.5);
+    expect(sporePx).toBeLessThan(5);
+    expect(shimPx / sporePx).toBeCloseTo(CONFIG.hero.height / 0.06, 4);
+  });
+
+  it('caps sprite size so a near mote cannot fill the frame', () => {
+    const spore = buildHushspores().material as THREE.ShaderMaterial;
+    const steam = buildSteam().material as THREE.ShaderMaterial;
+    expect(spore.uniforms.uMaxPixels!.value).toBeLessThanOrEqual(8);
+    expect(steam.uniforms.uMaxPixels!.value).toBeLessThanOrEqual(160);
   });
 
   it('rises eight to twelve metres, per §7', () => {
@@ -124,7 +166,8 @@ describe('motes driven by the sky', () => {
 
     expect(noon).toBeLessThan(0.25);
     expect(dusk).toBeGreaterThan(0.85);
-    expect(night).toBeGreaterThan(0.85);
+    // Still a column at 02:00; the taper toward dawn has barely started.
+    expect(night).toBeGreaterThan(0.8);
   });
 
   // §7: steam "catches the same sun the shaft does, so it is white at noon and
@@ -148,7 +191,9 @@ describe('motes driven by the sky', () => {
   it('keeps steam running at every hour — the vents do not sleep', () => {
     for (const h of [3, 9, 15, 21]) {
       motes.update(0, skyStateAt(tFromHours(h)));
-      expect(uniforms(motes.steam).uDensity!.value as number, `${h}h`).toBeGreaterThan(0.3);
+      // Low alpha on purpose: steam is vapour, and at 0.55 the plume covered
+      // half the frame as an opaque mass.
+      expect(uniforms(motes.steam).uDensity!.value as number, `${h}h`).toBeGreaterThan(0.1);
     }
   });
 

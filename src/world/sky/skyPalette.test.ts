@@ -180,7 +180,13 @@ describe('skyPalette', () => {
   it('ramps hushspores from a handful at noon to a column at dusk, and holds it', () => {
     expect(skyStateAt(tFromHours(solarNoonHour())).hushsporeDensity).toBeLessThan(0.25);
     expect(skyStateAt(tFromHours(CONFIG.sun.sunsetHour - 0.5)).hushsporeDensity).toBeGreaterThan(0.85);
-    expect(skyStateAt(tFromHours(2)).hushsporeDensity).toBeGreaterThan(0.85);
+    // Holds through the night and tapers toward dawn, per §3's "most of them
+    // at dusk" — at a full column all the way to sunrise the dawn frame was
+    // crowded.
+    expect(skyStateAt(tFromHours(2)).hushsporeDensity).toBeGreaterThan(0.8);
+    expect(skyStateAt(tFromHours(CONFIG.sun.sunriseHour + 0.5)).hushsporeDensity).toBeLessThan(
+      0.6,
+    );
   });
 
   it('keeps every channel inside 0..1', () => {

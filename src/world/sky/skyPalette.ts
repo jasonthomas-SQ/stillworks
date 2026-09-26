@@ -70,9 +70,10 @@ function keyframes(): Key[] {
         sunStrength: 0.85,
         fogColour: hex(S.dawn),
         background: hex(S.dawn),
-        // Still high: dawn is the end of the night column, not the start of
-        // the daytime handful. The ramp down happens on the way to noon.
-        hushsporeDensity: 0.85,
+        // Dawn is the end of the night column, tapering — not the start of the
+        // daytime handful, and not the full dusk column either. §3 says "most
+        // of them at dusk", and at 0.85 the dawn frame was crowded.
+        hushsporeDensity: 0.5,
         windGain: 0.5,
       },
     },

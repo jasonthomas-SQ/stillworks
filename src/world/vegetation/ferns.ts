@@ -195,7 +195,10 @@ export class Ferns {
     const groundPoints = scatterPoints({
       seed: CONFIG.seed + 303,
       count: 5200,
-      zones: ['A', 'B', 'C', 'E'],
+      // Zone C is deliberately absent. §4-C has the Warm Stones as dry pale
+      // rock with ferns drying ON it, not moss growing out of it — it is the
+      // one place on Kettle where nothing is wet.
+      zones: ['A', 'B', 'E'],
       maxGradient: 0.4,
       minScale: 0.7,
       maxScale: 1.5,

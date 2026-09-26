@@ -190,6 +190,11 @@ export class Game {
     this.applySky();
     this.water.update(this.elapsed, skyStateAt(this.clock), sunDirAt(this.clock));
     updateSway(this.elapsed);
+    // Point sprites are world-scaled, so they need the real drawing buffer
+    // height and the camera FOV. Cheap, and it survives a resize or a DPR
+    // change without a listener.
+    const buffer = this.bundle.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.motes.setViewport(buffer.y, this.camera.camera.fov);
     this.motes.update(this.elapsed, skyStateAt(this.clock));
     this.audio.update(this.hero, distanceToWater(this.hero.x, this.hero.z), skyStateAt(this.clock));
     this.camera.frameShadow(this.lighting.sun);
