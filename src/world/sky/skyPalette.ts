@@ -20,6 +20,8 @@ export type SkyState = {
   hemiSky: Rgb;
   hemiGround: Rgb;
   hemiIntensity: number;
+  /** Per-keyframe multiplier on the elevation-derived sun intensity. */
+  sunStrength: number;
   fogColour: Rgb;
   background: Rgb;
   /** 0 at noon through to 1 at dusk and overnight. Drives the hushspores. */
@@ -57,12 +59,15 @@ function keyframes(): Key[] {
     {
       hour: h.dawn,
       state: {
-        // Warm light, cool sky. The dawn hex is the sky's warmest and it is
-        // still cooler than the sun that lands on the terrace.
-        sunColour: hex('#FFD9B0'),
-        hemiSky: hex(S.dawn),
-        hemiGround: hex(P.fernDeep),
-        hemiIntensity: 0.75,
+        // Warm but not creamy: a more saturated dawn sun made lit rock read as
+        // sand rather than grey-green.
+        sunColour: hex('#FFE3CC'),
+        // The hemisphere LIGHT is not the sky hex. Lighting the world with the
+        // background colour is what made dusk sepia and night black.
+        hemiSky: hex('#9FB6BE'),
+        hemiGround: hex('#3C5A48'),
+        hemiIntensity: 0.68,
+        sunStrength: 0.85,
         fogColour: hex(S.dawn),
         background: hex(S.dawn),
         // Still high: dawn is the end of the night column, not the start of
@@ -77,7 +82,8 @@ function keyframes(): Key[] {
         sunColour: hex('#FFF4E0'),
         hemiSky: hex(S.noon),
         hemiGround: hex(P.mossLight),
-        hemiIntensity: 1,
+        hemiIntensity: 0.62,
+        sunStrength: 1,
         fogColour: hex(S.noon),
         background: hex(S.noon),
         hushsporeDensity: 0.15,
@@ -88,10 +94,15 @@ function keyframes(): Key[] {
       hour: h.dusk,
       state: {
         // §4-C: the last light lies across the vents and makes the steam gold.
-        sunColour: hex('#FFB06A'),
-        hemiSky: hex(S.dusk),
-        hemiGround: hex(P.fernDeep),
-        hemiIntensity: 0.7,
+        // Warm, but desaturated — at full saturation the whole frame went one
+        // orange-brown, which breaks §8's "cool shade, warm object".
+        sunColour: hex('#FFC79A'),
+        // Cool hemisphere against a warm sky, so shade stays green-grey and the
+        // warmth belongs to whatever the sun is actually hitting.
+        hemiSky: hex('#8FA8AE'),
+        hemiGround: hex('#35503F'),
+        hemiIntensity: 0.66,
+        sunStrength: 0.88,
         fogColour: hex(S.dusk),
         background: hex(S.dusk),
         hushsporeDensity: 1,
@@ -102,10 +113,14 @@ function keyframes(): Key[] {
       hour: h.night,
       state: {
         sunColour: hex('#8FA6B8'),
-        hemiSky: hex(S.night),
-        hemiGround: hex(P.fernDeep),
-        // Never black. "No darkness the player cannot walk out of" (§2).
-        hemiIntensity: 0.5,
+        // Moonlight, not darkness. The sky itself stays the bible's #16222A,
+        // but lighting the ground WITH that hex left Fernwell fully black at
+        // 23:00 — §2 is explicit: "no darkness the player cannot walk out of".
+        // Blue-green rather than grey, so the moss stays mossy at night.
+        hemiSky: hex('#5E8088'),
+        hemiGround: hex('#24413E'),
+        hemiIntensity: 0.92,
+        sunStrength: 0,
         fogColour: hex(S.night),
         background: hex(S.night),
         hushsporeDensity: 1,
@@ -158,7 +173,12 @@ export function skyStateAt(t: number): SkyState {
   // Sun intensity follows the sun's own elevation, so it cannot disagree with
   // where the sun actually is. Zero below the horizon.
   const elevation = sunDirAt(t)[1];
-  const sunIntensity = elevation <= 0 ? 0 : 3 * Math.min(1, elevation / 0.35);
+  const strength =
+    from.state.sunStrength + (to.state.sunStrength - from.state.sunStrength) * k;
+  const sunIntensity =
+    elevation <= 0
+      ? 0
+      : CONFIG.sun.peakIntensity * Math.min(1, elevation / 0.35) * strength;
 
   return {
     sunColour: mix(from.state.sunColour, to.state.sunColour, k),
@@ -167,6 +187,7 @@ export function skyStateAt(t: number): SkyState {
     hemiGround: mix(from.state.hemiGround, to.state.hemiGround, k),
     hemiIntensity:
       from.state.hemiIntensity + (to.state.hemiIntensity - from.state.hemiIntensity) * k,
+    sunStrength: strength,
     fogColour: mix(from.state.fogColour, to.state.fogColour, k),
     background: mix(from.state.background, to.state.background, k),
     hushsporeDensity:

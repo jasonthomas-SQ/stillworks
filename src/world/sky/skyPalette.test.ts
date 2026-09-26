@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { skyStateAt } from './skyPalette';
 import { tFromHours, advanceClock, hoursOf, solarNoonHour } from './dayClock';
 import { CONFIG } from '../../config';
+import { sunDirAt } from './sunDir';
+import { approximateLit, luminance, warmth, UP } from './shading';
+import { terrainColourAt } from '../island/terrainColour';
 
 const dist = (a: number[], b: number[]): number =>
   Math.hypot(...a.map((v, i) => v - b[i]!));
@@ -67,17 +70,87 @@ describe('skyPalette', () => {
 
   // World Bible §8: "Cool wins the frame; warm wins the eye."
   //
-  // Not testable as an absolute — the bible's own dawn sky is #E3C4AE, which is
-  // warm. The rule is relative: whatever the sky is doing, the light landing on
-  // brass and steam is warmer still, so the warm object wins the eye. That is
-  // what is asserted, through every daylight hour.
-  it('always keeps the sun warmer than the sky it hangs in', () => {
+  // Comparing sun hex to sky hex is not the right test — the bible's own dawn
+  // sky (#E3C4AE) is warmer than a desaturated dawn sun, and an unsound
+  // assertion is worse than none. What matters is what the player sees: a
+  // surface the sun reaches must come out warmer than the same surface in
+  // shade. That is asserted below against the shading model.
+  it('makes lit ground warmer than shaded ground at every sunlit hour', () => {
+    const rock = terrainColourAt(9, 1.2);
     for (let h = CONFIG.sun.sunriseHour; h <= CONFIG.sun.sunsetHour; h += 0.25) {
-      const s = skyStateAt(tFromHours(h));
-      const skyWarmth = s.background[0] - s.background[2];
-      const sunWarmth = s.sunColour[0] - s.sunColour[2];
-      expect(sunWarmth, `${h}h`).toBeGreaterThan(skyWarmth);
+      const t = tFromHours(h);
+      const s = skyStateAt(t);
+      if (s.sunIntensity < 0.5) continue;
+      const dir = sunDirAt(t);
+      const lit = approximateLit(rock, UP, s, dir, true);
+      const shaded = approximateLit(rock, UP, s, dir, false);
+      expect(warmth(lit), `${h}h lit vs shaded`).toBeGreaterThan(warmth(shaded));
     }
+  });
+
+  // The dusk frame came back as one flat orange-brown: shelf, walls and shade
+  // all the same sepia. The cause was lighting the world with the sky's own
+  // warm hex. Shade at dusk must stay green-grey.
+  it('keeps shade cool at dusk, not sepia', () => {
+    const t = tFromHours(CONFIG.sun.sunsetHour - 1);
+    const s = skyStateAt(t);
+    const rock = terrainColourAt(9, 1.2);
+    const shaded = approximateLit(rock, UP, s, sunDirAt(t), false);
+    expect(warmth(shaded), 'shaded rock at dusk').toBeLessThan(0.02);
+    expect(warmth(s.hemiSky), 'dusk hemisphere sky term').toBeLessThan(0);
+  });
+
+  // World Bible §2: "No darkness the player cannot walk out of." The first
+  // night build left Fernwell fully black at 23:00 with only the stream
+  // visible. Moonlight, not darkness.
+  it('keeps the night floor readable, and blue-green rather than grey', () => {
+    const t = tFromHours(23);
+    const s = skyStateAt(t);
+    const moss = terrainColourAt(7, 0.1);
+    const rock = terrainColourAt(9, 1.2);
+
+    const litMoss = approximateLit(moss, UP, s, sunDirAt(t), false);
+    const litRock = approximateLit(rock, UP, s, sunDirAt(t), false);
+
+    expect(luminance(litMoss), 'night moss').toBeGreaterThan(0.1);
+    expect(luminance(litRock), 'night rock').toBeGreaterThan(0.1);
+    // Still legible as moss and rock, not two identical greys. The gap is
+    // small at night by design — moonlight flattens everything — so this is a
+    // floor, not a target.
+    expect(Math.abs(luminance(litRock) - luminance(litMoss))).toBeGreaterThan(0.01);
+    // Blue-green, never grey: green and blue both clearly above red.
+    expect(litMoss[1]).toBeGreaterThan(litMoss[0]);
+    expect(litMoss[2]).toBeGreaterThan(litMoss[0]);
+  });
+
+  // Without tone mapping, anything over 1.0 is lost to pure white. A clipped
+  // floor is not a flat-colour look, it is a blown-out one — at the first sun
+  // intensity the noon moss came out 255,255,255.
+  it('never clips a surface to white at any hour', () => {
+    const surfaces: [string, ReturnType<typeof terrainColourAt>][] = [
+      ['moss floor', terrainColourAt(7, 0.1)],
+      ['rock face', terrainColourAt(9, 1.2)],
+      ['high ground', terrainColourAt(22, 0.2)],
+    ];
+    for (let h = 0; h < 24; h += 0.25) {
+      const t = tFromHours(h);
+      const s = skyStateAt(t);
+      for (const [name, base] of surfaces) {
+        const lit = approximateLit(base, UP, s, sunDirAt(t), true);
+        for (const c of lit) {
+          expect(c, `${name} at ${h}h clipped`).toBeLessThan(0.995);
+        }
+      }
+    }
+  });
+
+  it('keeps night darker than noon — readable is not the same as bright', () => {
+    const moss = terrainColourAt(7, 0.1);
+    const night = tFromHours(23);
+    const noon = tFromHours(solarNoonHour());
+    const nightLit = approximateLit(moss, UP, skyStateAt(night), sunDirAt(night), false);
+    const noonLit = approximateLit(moss, UP, skyStateAt(noon), sunDirAt(noon), true);
+    expect(luminance(nightLit)).toBeLessThan(luminance(noonLit) * 0.6);
   });
 
   it('puts the warmth in the sun, where it lands on brass and steam', () => {
@@ -88,7 +161,10 @@ describe('skyPalette', () => {
   it('turns the sun off below the horizon and on above it', () => {
     expect(skyStateAt(tFromHours(1)).sunIntensity).toBe(0);
     expect(skyStateAt(tFromHours(CONFIG.sun.sunriseHour - 0.5)).sunIntensity).toBe(0);
-    expect(skyStateAt(tFromHours(solarNoonHour())).sunIntensity).toBeGreaterThan(2.5);
+    expect(skyStateAt(tFromHours(solarNoonHour())).sunIntensity).toBeCloseTo(
+      CONFIG.sun.peakIntensity,
+      6,
+    );
   });
 
   // World Bible §2: "No darkness the player cannot walk out of."

@@ -67,6 +67,19 @@ export const CONFIG = {
     arcApexElevationDeg: 76,
     /** Tunable. Rotates the whole arc; negative rises NE and sets SW. */
     arcAzimuthOffsetDeg: -40,
+    /**
+     * Peak sun irradiance at solar noon.
+     *
+     * The architecture's post-cutover convention of ~3 is a PBR figure. This
+     * world is flat Lambert with no tone mapping and a bright palette: Moss
+     * Light's green channel is 0.64, so total irradiance above about 1.55
+     * clips it to pure white. Measured — at 3.0 the noon floor was 255,255,255.
+     *
+     * Keeping NoToneMapping and lowering the sun is the faithful choice here:
+     * the brief asks for flat colours and a frame that looks like a poster, and
+     * a poster has no film curve. A clipping assertion holds this honest.
+     */
+    peakIntensity: 1,
   },
 
   render: {

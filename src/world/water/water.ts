@@ -31,11 +31,12 @@ export function createWaterMaterial(): THREE.ShaderMaterial {
       THREE.UniformsLib.fog,
       {
         uTime: { value: 0 },
-        // Deep is the gorge's own green; shallow lifts toward moss so the
-        // water belongs to the place rather than sitting on top of it.
-        uDeep: { value: hexColour(P.fernDeep) },
-        uShallow: { value: hexColour(P.mossLight).lerp(hexColour(P.steamGrey), 0.45) },
-        uCrest: { value: hexColour(P.steamGrey) },
+        // Both tones sit ABOVE moss in value and close to each other, so water
+        // reads as a bright surface with a gentle two-tone ripple rather than a
+        // dark high-contrast stripe. Cool, per §8's wet rock and steam grey.
+        uDeep: { value: hexColour(P.steamGrey).lerp(hexColour(P.fernDeep), 0.34) },
+        uShallow: { value: hexColour(P.steamGrey).lerp(hexColour(P.mossLight), 0.16) },
+        uAmbient: { value: new THREE.Color(1, 1, 1) },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) },
         uSunColour: { value: new THREE.Color(1, 1, 1) },
         uSunIntensity: { value: 3 },
@@ -129,6 +130,13 @@ export class Water {
       THREE.SRGBColorSpace,
     );
     u.uSunIntensity!.value = state.sunIntensity;
+    // Hemisphere term for an up-facing surface: the sky half, at its intensity.
+    (u.uAmbient!.value as THREE.Color).setRGB(
+      state.hemiSky[0] * state.hemiIntensity,
+      state.hemiSky[1] * state.hemiIntensity,
+      state.hemiSky[2] * state.hemiIntensity,
+      THREE.SRGBColorSpace,
+    );
   }
 
   dispose(): void {
