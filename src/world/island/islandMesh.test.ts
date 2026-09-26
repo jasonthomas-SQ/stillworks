@@ -204,8 +204,45 @@ describe('terrainColourAt', () => {
   it('reads steep ground as rock, not as moss', () => {
     const moss = terrainColourAt(7, 0.1);
     const rock = terrainColourAt(7, 1.4);
-    expect(rock[0]).toBeGreaterThan(moss[0]); // brass-grey is redder than moss green
     expect(rock).not.toEqual(moss);
+    // Rock is paler and cooler than moss, never warmer.
+    const luma = (c: number[]): number => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    expect(luma(rock)).toBeGreaterThan(luma(moss));
+  });
+
+  // World Bible §8 reserves Ruin Brass (#8C7346, r-b = 0.27) for "the Spool
+  // Yard drums, cables, frame and housings". The M1 check saw lit slopes as tan
+  // and ochre because the terrain was using it. Rock in this world is a cool
+  // grey-green. Moss is not covered by this: a yellow-green is naturally
+  // red-heavy, and Moss Light is the bible's own floor colour.
+  it('never puts a warm colour on rock', () => {
+    for (let h = -4; h <= 34; h += 1) {
+      for (let g = 0.9; g <= 3; g += 0.25) {
+        const [r, , b] = terrainColourAt(h, g);
+        expect(r - b, `height ${h}, gradient ${g}`).toBeLessThan(0.05);
+      }
+    }
+  });
+
+  it('keeps rock lighter than moss so a wall never reads as a dark hole', () => {
+    const luma = (c: number[]): number => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    for (const h of [3, 7, 12, 20, 30]) {
+      expect(luma(terrainColourAt(h, 1.4)), `height ${h}`).toBeGreaterThan(
+        luma(terrainColourAt(h, 0.1)),
+      );
+    }
+  });
+
+  it('puts a crisp line between floor and wall, not a long blend', () => {
+    // The share of the gradient range spent transitioning from moss to rock.
+    const floor = terrainColourAt(7, 0.2);
+    const wall = terrainColourAt(7, 1.2);
+    const midway = terrainColourAt(7, 0.625);
+    const span = Math.hypot(...floor.map((v, i) => v - wall[i]!));
+    const toMid = Math.hypot(...floor.map((v, i) => v - midway[i]!));
+    // Halfway up the gradient range, the colour is already most of the way to
+    // rock: the transition happens in a narrow band, not across the whole slope.
+    expect(toMid / span).toBeGreaterThan(0.4);
   });
 
   it('stays inside 0..1 across the whole island range', () => {
